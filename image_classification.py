@@ -7,19 +7,15 @@
 import itertools
 import tensorflow as tf
 import numpy as np
-from packaging import version
+import os
 
+from tqdm import tqdm
 from sklearn.metrics import roc_curve, auc, precision_score, recall_score, f1_score
-
+from packaging import version
 from matplotlib import pyplot as plt
-
-
 
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
-
-# Weight initializers for the Generator network
-WEIGHT_INIT = tf.keras.initializers.RandomNormal(mean=0.0, stddev=0.2)
 
 
 # In[ ]:
@@ -36,8 +32,6 @@ def plot_roc_curve(fpr, tpr, name_model):
     plt.show()
     plt.clf()
     
-
-
 ''' calculate the auc value for labels and scores'''
 def roc(labels, scores, name_model):
     """Compute ROC curve and ROC area for each class"""
@@ -98,6 +92,37 @@ def plot_confusion_matrix(cm, classes,
 # In[ ]:
 
 
+def confusion_matrix_report(labels, predicts, target_names):
+    #importing confusion matrix
+    from sklearn.metrics import confusion_matrix
+    confusion = confusion_matrix(labels, predicts)
+    print('Confusion Matrix\n')
+    print(confusion)
+
+    #importing accuracy_score, precision_score, recall_score, f1_score
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    print('\nAccuracy: {:.2f}\n'.format(accuracy_score(labels, predicts)))
+
+    print('Micro Precision: {:.2f}'.format(precision_score(labels, predicts, average='micro')))
+    print('Micro Recall: {:.2f}'.format(recall_score(labels, predicts, average='micro')))
+    print('Micro F1-score: {:.2f}\n'.format(f1_score(labels, predicts, average='micro')))
+
+    print('Macro Precision: {:.2f}'.format(precision_score(labels, predicts, average='macro')))
+    print('Macro Recall: {:.2f}'.format(recall_score(labels, predicts, average='macro')))
+    print('Macro F1-score: {:.2f}\n'.format(f1_score(labels, predicts, average='macro')))
+
+    print('Weighted Precision: {:.2f}'.format(precision_score(labels, predicts, average='weighted')))
+    print('Weighted Recall: {:.2f}'.format(recall_score(labels, predicts, average='weighted')))
+    print('Weighted F1-score: {:.2f}'.format(f1_score(labels, predicts, average='weighted')))
+
+    from sklearn.metrics import classification_report
+    print('\nClassification Report\n')
+    print(classification_report(labels, predicts, target_names=target_names))
+
+
+# In[ ]:
+
+
 class CustomSaver(tf.keras.callbacks.Callback):
     def __init__(self,
                  model_path,
@@ -110,7 +135,6 @@ class CustomSaver(tf.keras.callbacks.Callback):
         self.custom_loss = []
         self.epochs_list = []
         
-    
     def on_train_begin(self, logs=None):
         if not hasattr(self, 'epoch'):
             self.epoch = []
@@ -121,7 +145,6 @@ class CustomSaver(tf.keras.callbacks.Callback):
         
         self.plot_epoch_result(self.epochs_list, self.custom_loss, "Loss", self.name_model, "g")
 
-    
     def on_epoch_end(self, epoch, logs={}):
         logs = logs or {}
         self.epoch.append(epoch)
@@ -132,7 +155,6 @@ class CustomSaver(tf.keras.callbacks.Callback):
         self.epochs_list.append(epoch)
         self.custom_loss.append(logs["loss"])
 
-        
         if (epoch + 1) % 15 == 0 or (epoch + 1) <= 15:
             self.model.save(self.model_path)
             print('saved for epoch',epoch + 1)
@@ -158,11 +180,10 @@ if __name__ == "__main__":
     analysis dataset used for classification of defects.
     '''
     
-    
     # run the function here
     """ Set Hyper parameters """
-    batch_size = 25
-    num_epochs = 100
+    batch_size = 32
+    num_epochs = 10
     
     IMG_H = 110
     IMG_W = 42
@@ -170,7 +191,7 @@ if __name__ == "__main__":
 
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     print("start: ", name_model)
-    base_learning_rate = 0.0001
+    base_learning_rate = 0.0002
     num_classes = 8
     
     # set dir of files
@@ -186,7 +207,6 @@ if __name__ == "__main__":
     # set input 
     inputs = tf.keras.layers.Input(input_shape, name="input_1")
 
-
     train_ds = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
         validation_split=0.2,
@@ -196,8 +216,16 @@ if __name__ == "__main__":
         batch_size=batch_size)
 
     class_names = train_ds.class_names
-    print(class_names)
-
+    print("name of classes: ", class_names, "Size of classes: ", len(class_names))
+    
+    val_ds = tf.keras.utils.image_dataset_from_directory(
+        train_data_path,
+        validation_split=0.2,
+        subset="validation",
+        seed=123,
+        image_size=(IMG_H, IMG_W),
+        batch_size=batch_size)
+    
 #     plt.figure(figsize=(10, 10))
 #     for images, labels in train_ds.take(1):
 #         for i in range(9):
@@ -212,30 +240,56 @@ if __name__ == "__main__":
                                                             input_shape=(IMG_H,
                                                                          IMG_W,
                                                                          IMG_C)),
-      tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
+      # tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
     ])
 
-    our_model = tf.keras.models.Sequential([
-        data_augmentation,
-        tf.keras.layers.Rescaling(1./255, input_shape=(IMG_H, IMG_W, IMG_C)),
-        tf.keras.layers.Conv2D(16, 3, padding='same', activation='relu'),
-        tf.keras.layers.MaxPooling2D(),
-        tf.keras.layers.Conv2D(32, 3, padding='same', activation='relu'),
-        tf.keras.layers.MaxPooling2D(),
-        tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu'),
-        tf.keras.layers.MaxPooling2D(),
-        tf.keras.layers.Dropout(0.2),
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(128, activation='relu'),
-        tf.keras.layers.Dense(num_classes)
-    ])
-    
+    normalization_layer = tf.keras.layers.Rescaling(1./127.5, offset=-1,input_shape=(IMG_H, IMG_W, IMG_C))
+
+    our_model = tf.keras.models.Sequential()
+#     our_model.add(data_augmentation)
+    our_model.add(normalization_layer)
+
+    our_model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+
+    our_model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+    our_model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    our_model.add(tf.keras.layers.Dropout(0.2))
+
+    our_model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+
+    our_model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+    our_model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    our_model.add(tf.keras.layers.Dropout(0.3))
+
+    our_model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.BatchNormalization())
+
+    our_model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+    our_model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    our_model.add(tf.keras.layers.Dropout(0.4))
+    our_model.add(tf.keras.layers.Flatten())
+
+    our_model.add(tf.keras.layers.Dense(128, kernel_initializer='he_uniform'))
+    our_model.add(tf.keras.layers.LeakyReLU())
+    our_model.add(tf.keras.layers.BatchNormalization())
+    our_model.add(tf.keras.layers.Dropout(0.5))
+    our_model.add(tf.keras.layers.Dense(num_classes))
+
     our_model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               optimizer = tf.keras.optimizers.Adam(learning_rate=base_learning_rate/10),
               metrics=['accuracy'])
     
 #     our_model.summary()
-    
     
     saver_callback = CustomSaver(
         path_model,
@@ -245,30 +299,9 @@ if __name__ == "__main__":
     fit_history = our_model.fit(
         train_ds,
         epochs=num_epochs,
+        validation_data=val_ds,
         callbacks=[saver_callback]
     )
-    
-    
-#     acc = fit_history.history['accuracy']
-#     val_acc = fit_history.history['val_accuracy']
-#     loss = fit_history.history['loss']
-#     val_loss = fit_history.history['val_loss']
-
-#     epochs = range(len(acc))
-
-#     plt.plot(epochs, acc, 'r', label='Training accuracy')
-#     plt.plot(epochs, val_acc, 'b', label='Validation accuracy')
-#     plt.title('Training and validation accuracy')
-
-#     plt.figure()
-
-#     plt.plot(epochs, loss, 'r', label='Training Loss')
-#     plt.plot(epochs, val_loss, 'b', label='Validation Loss')
-#     plt.title('Training and validation loss')
-
-#     plt.legend()
-
-#     plt.show()
     
     
     """
@@ -281,14 +314,9 @@ if __name__ == "__main__":
         image_size=(IMG_H, IMG_W),
         batch_size=batch_size
     )
-    numpy_labels = None
-    for _, labels in evaluation_ds.take(1):  # only take first element of dataset
-#     numpy_images = images.numpy()
-        numpy_labels = labels.numpy()
     
+    evaluation_ds = evaluation_ds.map(lambda x, y: (normalization_layer(x), y))
     
-    y = np.concatenate([y for x, y in evaluation_ds], axis=0)
-    print(y)
     # Evaluate the model on the test data using `evaluate`
     # You can also evaluate or predict on a dataset.
     print("Evaluate")
@@ -296,20 +324,45 @@ if __name__ == "__main__":
     print(result)
     dict(zip(our_model.metrics_names, result))
 
-        
-    pred_result = our_model.predict(evaluation_ds)
-    print(pred_result)
+    """
+    Testing Area
+    """
     
-    # Generate arg maxes for predictions
-#     score = tf.nn.softmax(pred_result)
-    classes = np.argmax(pred_result, axis = 1)
-    print(classes)
-#     print(len(classes))
-#     
+    pred_list = []
+    name_image_list = []
+    label_list = []
+    format_image = [".jpg",".png",".jpeg"]
     
-#     print(score)
-#     print(
-#         "This image most likely belongs to {} with a {:.2f} percent confidence."
-#         .format(class_names[np.argmax(score)], 100 * np.max(score))
-#     )
+    probability_model = tf.keras.Sequential([our_model, 
+                                         tf.keras.layers.Softmax()])
+    for class_n in class_names: 
+        path = os.path.join(test_data_path,class_n)  
+        class_num = class_names.index(class_n)  
+
+        for img in tqdm(os.listdir(path)):  
+            if img.endswith(tuple(format_image)):
+                filepath = os.path.join(path, img)
+                name_image = os.path.basename(filepath)
+#                 print("name image: ", name_image, "label image: ", class_num)
+                
+                img = tf.keras.utils.load_img(
+                    filepath, target_size=(IMG_H, IMG_W)
+                )
+                img_array = tf.keras.utils.img_to_array(img)
+                img_array = tf.expand_dims(img_array, 0) # Create a batch
+
+                pred_result = probability_model.predict(img_array)
+                # Generate arg maxes for predictionsß
+                   
+                pred_classes = np.argmax(pred_result[0])
+                
+                pred_list.append(pred_classes)
+                name_image_list.append(name_image)
+                label_list.append(class_num)
+
+    final_result = zip(name_image_list, label_list, pred_list)
+    for n, l, p in final_result:
+         print("name image: ", n, "label image: ", l, "prediction class: ", p)
+#     print("final result: ", final_result)
+    confusion_matrix_report(label_list, pred_list, class_names)
 
