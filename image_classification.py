@@ -8,9 +8,10 @@ import itertools
 import tensorflow as tf
 import numpy as np
 import os
+import csv
 
 from tqdm import tqdm
-from sklearn.metrics import roc_curve, auc, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
 from packaging import version
 from matplotlib import pyplot as plt
 
@@ -93,14 +94,10 @@ def plot_confusion_matrix(cm, classes,
 
 
 def confusion_matrix_report(labels, predicts, target_names):
-    #importing confusion matrix
-    from sklearn.metrics import confusion_matrix
     confusion = confusion_matrix(labels, predicts)
     print('Confusion Matrix\n')
     print(confusion)
-
-    #importing accuracy_score, precision_score, recall_score, f1_score
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    
     print('\nAccuracy: {:.2f}\n'.format(accuracy_score(labels, predicts)))
 
     print('Micro Precision: {:.2f}'.format(precision_score(labels, predicts, average='micro')))
@@ -115,7 +112,6 @@ def confusion_matrix_report(labels, predicts, target_names):
     print('Weighted Recall: {:.2f}'.format(recall_score(labels, predicts, average='weighted')))
     print('Weighted F1-score: {:.2f}'.format(f1_score(labels, predicts, average='weighted')))
 
-    from sklearn.metrics import classification_report
     print('\nClassification Report\n')
     print(classification_report(labels, predicts, target_names=target_names))
 
@@ -296,12 +292,12 @@ if __name__ == "__main__":
         name_model
     )
     
-    fit_history = our_model.fit(
-        train_ds,
-        epochs=num_epochs,
-        validation_data=val_ds,
-        callbacks=[saver_callback]
-    )
+#     fit_history = our_model.fit(
+#         train_ds,
+#         epochs=num_epochs,
+#         validation_data=val_ds,
+#         callbacks=[saver_callback]
+#     )
     
     
     """
@@ -363,6 +359,14 @@ if __name__ == "__main__":
     final_result = zip(name_image_list, label_list, pred_list)
     for n, l, p in final_result:
          print("name image: ", n, "label image: ", l, "prediction class: ", p)
+            
 #     print("final result: ", final_result)
     confusion_matrix_report(label_list, pred_list, class_names)
+    
+    
+    print("created csv for the result.")
+    with open('predictions_result.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(['ImageName', 'Label'])
+        writer.writerows(zip(name_image_list, pred_list))
 
