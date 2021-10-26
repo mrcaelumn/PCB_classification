@@ -9,9 +9,10 @@ import tensorflow as tf
 import numpy as np
 import os
 import csv
-
+     
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.utils import class_weight
 from packaging import version
 from matplotlib import pyplot as plt
 
@@ -205,22 +206,29 @@ if __name__ == "__main__":
 
     train_ds = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
-        validation_split=0.2,
-        subset="training",
-        seed=123,
+#         validation_split=0.2,
+#         subset="training",
+#         seed=123,
         image_size=(IMG_H, IMG_W),
         batch_size=batch_size)
 
     class_names = train_ds.class_names
     print("name of classes: ", class_names, "Size of classes: ", len(class_names))
     
-    val_ds = tf.keras.utils.image_dataset_from_directory(
-        train_data_path,
-        validation_split=0.2,
-        subset="validation",
-        seed=123,
-        image_size=(IMG_H, IMG_W),
-        batch_size=batch_size)
+    y = np.concatenate([y for x, y in train_ds], axis=0)
+    class_weights = class_weight.compute_class_weight(
+           'balanced',
+            np.unique(y), 
+            y)
+    
+    train_class_weights = dict(enumerate(class_weights))
+#     val_ds = tf.keras.utils.image_dataset_from_directory(
+#         train_data_path,
+#         validation_split=0.2,
+#         subset="validation",
+#         seed=123,
+#         image_size=(IMG_H, IMG_W),
+#         batch_size=batch_size)
     
 #     plt.figure(figsize=(10, 10))
 #     for images, labels in train_ds.take(1):
@@ -239,7 +247,8 @@ if __name__ == "__main__":
       # tf.keras.layers.experimental.preprocessing.RandomRotation(0.2),
     ])
 
-    normalization_layer = tf.keras.layers.Rescaling(1./127.5, offset=-1,input_shape=(IMG_H, IMG_W, IMG_C))
+#     normalization_layer = tf.keras.layers.Rescaling(1./127.5, offset=-1,input_shape=(IMG_H, IMG_W, IMG_C))
+    normalization_layer = tf.keras.layers.Rescaling(1./255,input_shape=(IMG_H, IMG_W, IMG_C))
 
     our_model = tf.keras.models.Sequential()
 #     our_model.add(data_augmentation)
@@ -292,13 +301,17 @@ if __name__ == "__main__":
         name_model
     )
     
-#     fit_history = our_model.fit(
-#         train_ds,
-#         epochs=num_epochs,
+    fit_history = our_model.fit(
+        train_ds,
+        epochs=num_epochs,
 #         validation_data=val_ds,
-#         callbacks=[saver_callback]
-#     )
+        class_weight=train_class_weights,
+        callbacks=[saver_callback]
+        
+    )
     
+    
+    print("class_weights: ", class_weights)
     
     """
     Evaluation Area
@@ -369,4 +382,10 @@ if __name__ == "__main__":
         writer = csv.writer(f)
         writer.writerow(['ImageName', 'Label'])
         writer.writerows(zip(name_image_list, pred_list))
+
+
+# In[ ]:
+
+
+
 
