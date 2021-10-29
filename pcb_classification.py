@@ -301,6 +301,8 @@ def dataset_manipulation(train_data_path):
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
+    train_dataset = augment_dataset_batch_test(train_dataset)
+    
     train_dataset = train_dataset.unbatch()
 #     print(len(list(train_dataset)))
     train_dataset_dict = {}
@@ -333,8 +335,6 @@ def dataset_manipulation(train_data_path):
         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
     final_dataset = final_dataset.batch(32).prefetch(2)
-    
-    final_dataset = augment_dataset_batch_test(final_dataset)
     
     return final_dataset
 
@@ -407,4 +407,10 @@ if __name__ == "__main__":
     )
     
     evaluate_and_testing(our_model, path_model, test_data_path, class_name)
+
+
+# In[ ]:
+
+
+
 
