@@ -48,9 +48,15 @@ def augment_dataset_batch_test(dataset_batch):
 
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
               num_parallel_calls=AUTOTUNE)
+    
+    rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
+              num_parallel_calls=AUTOTUNE)
+    
+    
 
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
+    dataset_batch = dataset_batch.concatenate(rotate)
     
     
     return dataset_batch
@@ -303,40 +309,41 @@ def dataset_manipulation(train_data_path):
     
     train_dataset = augment_dataset_batch_test(train_dataset)
     
-    train_dataset = train_dataset.unbatch()
-#     print(len(list(train_dataset)))
-    train_dataset_dict = {}
-    top_number_of_dataset = 0
-    for a in range(0, 8):
-        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-        len_current_dataset = len(list(filtered_dataset))
-        train_dataset_dict[a] = filtered_dataset
-#         train_dataset_dict.append(filtered_dataset)
-        if len_current_dataset > top_number_of_dataset:
-            top_number_of_dataset = len_current_dataset
+#     train_dataset = train_dataset.unbatch()
+# #     print(len(list(train_dataset)))
+#     train_dataset_dict = {}
+#     top_number_of_dataset = 0
+#     for a in range(0, 8):
+#         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+#         len_current_dataset = len(list(filtered_dataset))
+#         train_dataset_dict[a] = filtered_dataset
+# #         train_dataset_dict.append(filtered_dataset)
+#         if len_current_dataset > top_number_of_dataset:
+#             top_number_of_dataset = len_current_dataset
         
-    print(top_number_of_dataset)
+#     print(top_number_of_dataset)
 
     
-#     train_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.not_equal(y, [1,2,3,4,5,6,7])))
-#     print(train_dataset)
-#     print(len(list(train_dataset)))
-    for a in range(0, 8):
-        current_dataset = train_dataset_dict[a]
-        len_current_dataset = len(list(train_dataset_dict[a]))
-        times_multi = int(top_number_of_dataset/len_current_dataset)
-        print("times_multi: ", times_multi)
-        current_dataset = current_dataset.repeat(times_multi)
-        print(len(list(current_dataset)))
-        train_dataset_dict[a] = current_dataset
+# #     train_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.not_equal(y, [1,2,3,4,5,6,7])))
+# #     print(train_dataset)
+# #     print(len(list(train_dataset)))
+#     for a in range(0, 8):
+#         current_dataset = train_dataset_dict[a]
+#         len_current_dataset = len(list(train_dataset_dict[a]))
+#         times_multi = int(top_number_of_dataset/len_current_dataset)
+#         print("times_multi: ", times_multi)
+#         current_dataset = current_dataset.repeat(times_multi)
+#         print(len(list(current_dataset)))
+#         train_dataset_dict[a] = current_dataset
     
-    final_dataset = train_dataset_dict[0]
-    for a in range (1, 8):
-        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+#     final_dataset = train_dataset_dict[0]
+#     for a in range (1, 8):
+#         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
-    final_dataset = final_dataset.batch(32).prefetch(2)
+#     final_dataset = final_dataset.batch(32).prefetch(2)
     
-    return final_dataset
+#     return final_dataset
+    return train_dataset
 
 
 # In[ ]:
