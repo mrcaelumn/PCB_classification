@@ -389,9 +389,9 @@ if __name__ == "__main__":
     
     y = np.concatenate([y for x, y in train_dataset], axis=0)
     class_weights = class_weight.compute_class_weight(
-           'balanced',
-            np.unique(y), 
-            y)
+        class_weight='balanced',
+        classes=np.unique(y), 
+        y=y)
     
     train_class_weights = dict(enumerate(class_weights))
     
