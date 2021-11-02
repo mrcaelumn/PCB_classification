@@ -34,14 +34,13 @@ IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
+AUTOTUNE = tf.data.AUTOTUNE
 
 
 # In[ ]:
 
 
 def augment_dataset_batch_test(dataset_batch):
-    AUTOTUNE = tf.data.AUTOTUNE
-    
     
     flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
               num_parallel_calls=AUTOTUNE)
@@ -49,22 +48,14 @@ def augment_dataset_batch_test(dataset_batch):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
               num_parallel_calls=AUTOTUNE)
     
-    #rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
-    #          num_parallel_calls=AUTOTUNE)
+#     rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
+#               num_parallel_calls=AUTOTUNE)
     
-    #flip_up_down_test = flip_left_right.map(lambda image, label: (tf.image.flip_up_down(image), label),
-    #          num_parallel_calls=AUTOTUNE)
-
-    #flip_left_right_test = flip_up_down.map(lambda image, label: (tf.image.flip_left_right(image), label),
-    #          num_parallel_calls=AUTOTUNE)
-
-
+    
 
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    #dataset_batch = dataset_batch.concatenate(flip_up_down_test)
-    #dataset_batch = dataset_batch.concatenate(flip_left_right_test)
-    #dataset_batch = dataset_batch.concatenate(rotate)
+#     dataset_batch = dataset_batch.concatenate(rotate)
     
     
     return dataset_batch
@@ -181,11 +172,25 @@ class CustomSaver(tf.keras.callbacks.Callback):
 # In[ ]:
 
 
-def build_our_model(i_shape, base_lr, n_class):
+def build_our_model(i_shape, base_lr, n_class, augmentation=True):
     
     model = tf.keras.models.Sequential()
-
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer='he_uniform', padding='same', input_shape=i_shape))
+    
+    
+    rescaling = tf.keras.Sequential([
+      tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape)
+    ])
+    
+    model.add(rescaling)
+    if augmentation:
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.2),
+        ])
+        model.add(data_augmentation)
+        
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer='he_uniform', padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
@@ -206,6 +211,7 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.3))
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer='he_uniform', padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer='he_uniform', padding='same'))
@@ -213,6 +219,7 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.4))
+    
     model.add(tf.keras.layers.Flatten())
 
     model.add(tf.keras.layers.Dense(128, kernel_initializer='he_uniform'))
@@ -238,7 +245,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     this_model.load_weights(p_model)
     evaluation_ds = tf.keras.utils.image_dataset_from_directory(
         test_dataset_path,
-        seed=123,
+#         seed=123,
         image_size=(IMG_H, IMG_W),
         batch_size=batch_size
     )
@@ -305,65 +312,30 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 # @tf.function
 def dataset_manipulation(train_data_path):
-    AUTOTUNE = tf.data.AUTOTUNE
+    
     train_dataset = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
-        #validation_split=0.2,
-        #subset="training",
-        #seed=123,
+        validation_split=0.2,
+        subset="training",
+        seed=123,
         image_size=(IMG_H, IMG_W))
 
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
-   # valid_dataset = tf.keras.utils.image_dataset_from_directory(
-    #    train_data_path,
-     #   validation_split=0.2,
-      #  subset="validation",
-       # seed=123,
-       # image_size=(IMG_H, IMG_W))
-
-
+    valid_dataset = tf.keras.utils.image_dataset_from_directory(
+        train_data_path,
+        validation_split=0.2,
+        subset="validation",
+        seed=123,
+        image_size=(IMG_H, IMG_W)
+    )
 
     train_dataset = augment_dataset_batch_test(train_dataset)
-    #valid_dataset = augment_dataset_batch_test(valid_dataset)
+    valid_dataset = augment_dataset_batch_test(valid_dataset)
     
-#    train_dataset = train_dataset.unbatch()
-#     print(len(list(train_dataset)))
-#    train_dataset_dict = {}
-#    top_number_of_dataset = 0
-#    for a in range(0, 8):
-#        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-#        len_current_dataset = len(list(filtered_dataset))
-#        train_dataset_dict[a] = filtered_dataset
-        # train_dataset_dict.append(filtered_dataset)
-#        if len_current_dataset > top_number_of_dataset:
-#            top_number_of_dataset = len_current_dataset
-        
-#     print(top_number_of_dataset)
-
-    
-# #     train_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.not_equal(y, [1,2,3,4,5,6,7])))
-# #     print(train_dataset)
-# #     print(len(list(train_dataset)))
-#    for a in range(0, 8):
-#        current_dataset = train_dataset_dict[a]
-#        len_current_dataset = len(list(train_dataset_dict[a]))
-        # times_multi = int(top_number_of_dataset/len_current_dataset)
-        # print("times_multi: ", times_multi)
-#        if a not in [0,5]:
-#            current_dataset = current_dataset.repeat(2)
-#        print(len(list(current_dataset)))
-#        train_dataset_dict[a] = current_dataset
-    
-#    final_dataset = train_dataset_dict[0]
-#    for a in range (1, 8):
-#        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
-        
-#    final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
-    
-#    return final_dataset
-    return train_dataset, None
+#     return train_dataset, None
+    return train_dataset, valid_dataset
 
 
 # In[ ]:
@@ -379,12 +351,12 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     batch_size = 32
-    num_epochs = 150
+    num_epochs = 10
 
 
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     print("start: ", name_model)
-    base_learning_rate = 0.0004
+    base_learning_rate = 0.0002
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -409,7 +381,7 @@ if __name__ == "__main__":
         name_model
     )
     
-    train_dataset, valid_dataset = dataset_manipulation(train_data_path)
+    train_dataset, val_dataset = dataset_manipulation(train_data_path)
     
     
     print(train_dataset)
@@ -417,9 +389,9 @@ if __name__ == "__main__":
     
     y = np.concatenate([y for x, y in train_dataset], axis=0)
     class_weights = class_weight.compute_class_weight(
-           class_weight='balanced',
-            classes=np.unique(y), 
-            y=y)
+           'balanced',
+            np.unique(y), 
+            y)
     
     train_class_weights = dict(enumerate(class_weights))
     
@@ -428,7 +400,7 @@ if __name__ == "__main__":
     fit_history = our_model.fit(
         train_dataset,
         epochs=num_epochs,
-        #validation_data=valid_dataset,
+        validation_data=val_dataset,
         class_weight=train_class_weights,
         callbacks=[saver_callback]   
     )
