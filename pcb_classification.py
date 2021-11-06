@@ -47,15 +47,20 @@ def augment_dataset_batch_test(dataset_batch):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
               num_parallel_calls=AUTOTUNE)
     
+    central_fraction = dataset_batch.map(lambda image, label: (tf.image.central_crop(image, central_fraction=0.1), label),
+              num_parallel_calls=AUTOTUNE)
+    
+    adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, central_fraction=0.1), label),
+              num_parallel_calls=AUTOTUNE)
+    
 #     rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
 #               num_parallel_calls=AUTOTUNE)
     
-    
-
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
+    dataset_batch = dataset_batch.concatenate(central_fraction)
+    dataset_batch = dataset_batch.concatenate(adjust_brightness)
 #     dataset_batch = dataset_batch.concatenate(rotate)
-    
     
     return dataset_batch
 
@@ -456,8 +461,16 @@ if __name__ == "__main__":
     batch_size = 32
     num_epochs = 100
     choosen_model = 3 # 1 == our model, 2 == resnet50, 3 == efficientnet
-
+    
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
+    
+    if choosen_model == 1:
+        name_model = name_model + "-custom_model"
+    elif choosen_model == 2:
+        name_model = name_model + "-resnet50"
+    elif choosen_model == 3:
+        name_model = name_model + "-efficientnet"
+        
     print("start: ", name_model)
     base_learning_rate = 0.0003
     num_classes = 8
@@ -478,27 +491,23 @@ if __name__ == "__main__":
         """
         our custom model
         """ 
-        print("running", name_model, "-our_model")
+        print("running", name_model)
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
-        our_model.summary()
+        # our_model.summary()
         __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
-    
     elif choosen_model == 2:
         """
         resnet50
         """
-        print("running", name_model, "-resnet50")
+        print("running", name_model)
         our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
-        
         __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
-    
     elif choosen_model == 3:
         """
         efficientnet
         """
-        print("running", name_model, "-efficientnet")
+        print("running", name_model)
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        
         __run__(our_efficientnet, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
 
 
