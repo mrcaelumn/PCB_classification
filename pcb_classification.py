@@ -248,7 +248,7 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
         
     
     model.add(base_model)
-    model.layers[0].trainable = True
+    model.layers[0].trainable = False
     
     model.add(tf.keras.layers.Dense(512))
     model.add(tf.keras.layers.LeakyReLU())
@@ -283,7 +283,7 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
         
     
     model.add(base_model)
-    model.layers[0].trainable = True
+    model.layers[0].trainable = False
     
     model.add(tf.keras.layers.Flatten())
     
