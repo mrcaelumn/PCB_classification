@@ -236,10 +236,10 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     model = tf.keras.models.Sequential()
     
     base_model = tf.keras.applications.ResNet50(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
-    
+    # base_model.summary()
     base_model.trainable = False
         
-    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     if augmentation:
         data_augmentation = tf.keras.Sequential([
             tf.keras.layers.RandomFlip("horizontal_and_vertical"),
@@ -270,10 +270,10 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     model = tf.keras.models.Sequential()
     
     base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = 'imagenet')
-    
+    # base_model.summary()
     base_model.trainable = False
         
-    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     
     if augmentation:
         data_augmentation = tf.keras.Sequential([
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     """ Set Hyper parameters """
     batch_size = 32
     num_epochs = 100
-    choosen_model = 2 # 1 == our model, 2 == resnet50, 3 == efficientnet
+    choosen_model = 3 # 1 == our model, 2 == resnet50, 3 == efficientnet
 
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     print("start: ", name_model)
@@ -480,6 +480,7 @@ if __name__ == "__main__":
         """ 
         print("running", name_model, "-our_model")
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+        our_model.summary()
         __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     
     elif choosen_model == 2:
@@ -488,6 +489,7 @@ if __name__ == "__main__":
         """
         print("running", name_model, "-resnet50")
         our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
+        
         __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     
     elif choosen_model == 3:
@@ -496,5 +498,12 @@ if __name__ == "__main__":
         """
         print("running", name_model, "-efficientnet")
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
+        
         __run__(our_efficientnet, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+
+
+# In[ ]:
+
+
+
 
