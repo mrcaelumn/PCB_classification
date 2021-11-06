@@ -175,7 +175,7 @@ def build_our_model(i_shape, base_lr, n_class, augmentation=False):
     
     model = tf.keras.models.Sequential()
     
-    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     if augmentation:
         data_augmentation = tf.keras.Sequential([
             tf.keras.layers.RandomFlip("horizontal_and_vertical"),
@@ -251,10 +251,10 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     model.add(base_model)
     
     model.add(tf.keras.layers.Dense(512))
-    model.add(tf.keras.layers.LeakyReLU())
+    # model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="sigmoid"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -289,10 +289,10 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     model.add(tf.keras.layers.Flatten())
     
     model.add(tf.keras.layers.Dense(512))
-    model.add(tf.keras.layers.LeakyReLU())
+    # model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="sigmoid"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -333,7 +333,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     label_list = []
     
     probability_model = tf.keras.Sequential([
-        tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape), 
+        tf.keras.layers.Rescaling(scale=1./255, input_shape=(IMG_H, IMG_W, IMG_C)), 
         this_model
     ])
     for class_n in c_names:
