@@ -237,6 +237,8 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     
     base_model = tf.keras.applications.ResNet50(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
     
+    base_model.trainable = False
+        
     model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
     if augmentation:
         data_augmentation = tf.keras.Sequential([
@@ -244,11 +246,9 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
             tf.keras.layers.RandomRotation(0.2),
             tf.keras.layers.RandomZoom(0.2),
         ])
-        model.add(data_augmentation)
-        
+        model.add(data_augmentation)    
     
     model.add(base_model)
-    model.layers[0].trainable = False
     
     model.add(tf.keras.layers.Dense(512))
     model.add(tf.keras.layers.LeakyReLU())
@@ -271,6 +271,8 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     
     base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = 'imagenet')
     
+    base_model.trainable = False
+        
     model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
     
     if augmentation:
@@ -283,7 +285,6 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
         
     
     model.add(base_model)
-    model.layers[0].trainable = False
     
     model.add(tf.keras.layers.Flatten())
     
