@@ -50,7 +50,7 @@ def augment_dataset_batch_test(dataset_batch):
     central_fraction = dataset_batch.map(lambda image, label: (tf.image.central_crop(image, central_fraction=0.1), label),
               num_parallel_calls=AUTOTUNE)
     
-    adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, central_fraction=0.1), label),
+    adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
               num_parallel_calls=AUTOTUNE)
     
 #     rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
