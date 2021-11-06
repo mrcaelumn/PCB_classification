@@ -15,7 +15,6 @@
 # In[ ]:
 
 
-
 import tensorflow as tf
 import numpy as np
 import os
@@ -172,11 +171,20 @@ class CustomSaver(tf.keras.callbacks.Callback):
 # In[ ]:
 
 
-def build_our_model(i_shape, base_lr, n_class, augmentation=True):
+def build_our_model(i_shape, base_lr, n_class, augmentation=False):
     
     model = tf.keras.models.Sequential()
-
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=i_shape))
+    
+    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    if augmentation:
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.2),
+        ])
+        model.add(data_augmentation)
+        
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
@@ -197,6 +205,7 @@ def build_our_model(i_shape, base_lr, n_class, augmentation=True):
     model.add(tf.keras.layers.Dropout(0.3))
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
@@ -204,15 +213,86 @@ def build_our_model(i_shape, base_lr, n_class, augmentation=True):
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.4))
+    
     model.add(tf.keras.layers.Flatten())
 
-    model.add(tf.keras.layers.Dense(128))
+    model.add(tf.keras.layers.Dense(512))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+                  metrics=['accuracy'])
+    
+    return model
+
+
+# In[ ]:
+
+
+def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
+    model = tf.keras.models.Sequential()
+    
+    base_model = tf.keras.applications.ResNet50(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
+    
+    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    if augmentation:
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.2),
+        ])
+        model.add(data_augmentation)
+        
+    
+    model.add(base_model)
+    
+    model.layers[0].trainable = True 
+    model.add(tf.keras.layers.Dense(512))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+                  metrics=['accuracy'])
+    
+    return model
+
+
+# In[ ]:
+
+
+def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
+    model = tf.keras.models.Sequential()
+    
+    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = 'imagenet')
+    
+    model.add(tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape))
+    
+    if augmentation:
+        data_augmentation = tf.keras.Sequential([
+            tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+            tf.keras.layers.RandomRotation(0.2),
+            tf.keras.layers.RandomZoom(0.2),
+        ])
+        model.add(data_augmentation)
+        
+    
+    model.add(base_model)
+    
+    model.add(tf.keras.layers.Flatten())
+    
+    model.add(tf.keras.layers.Dense(512))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -249,7 +329,11 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     pred_list = []
     name_image_list = []
     label_list = []
-
+    
+    probability_model = tf.keras.Sequential([
+        tf.keras.layers.Rescaling(scale=1./127.5, offset=-1, input_shape=i_shape), 
+        this_model
+    ])
     for class_n in c_names:
         path = os.path.join(test_dataset_path, class_n)
         class_num = c_names.index(class_n)
@@ -264,6 +348,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                     filepath, target_size=(IMG_H, IMG_W)
                 )
                 img_array = tf.keras.utils.img_to_array(img)
+                
                 img_array = tf.expand_dims(img_array, 0) # Create a batch
 
                 pred_result = this_model.predict(img_array)
@@ -298,27 +383,60 @@ def dataset_manipulation(train_data_path):
     
     train_dataset = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
-        validation_split=0.2,
-        subset="training",
-        seed=123,
+#         validation_split=0.2,
+#         subset="training",
+#         seed=123,
         image_size=(IMG_H, IMG_W))
 
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
-    valid_dataset = tf.keras.utils.image_dataset_from_directory(
-        train_data_path,
-        validation_split=0.2,
-        subset="validation",
-        seed=123,
-        image_size=(IMG_H, IMG_W)
-    )
+#     valid_dataset = tf.keras.utils.image_dataset_from_directory(
+#         train_data_path,
+#         validation_split=0.2,
+#         subset="validation",
+#         seed=123,
+#         image_size=(IMG_H, IMG_W)
+#     )
 
     train_dataset = augment_dataset_batch_test(train_dataset)
-    valid_dataset = augment_dataset_batch_test(valid_dataset)
+#     valid_dataset = augment_dataset_batch_test(valid_dataset)
     
-#     return train_dataset, None
-    return train_dataset, valid_dataset
+    return train_dataset, None
+#     return train_dataset, valid_dataset
+
+
+# In[ ]:
+
+
+def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size):
+    
+#     y = np.concatenate([y for x, y in train_dataset], axis=0)
+#     class_weights = class_weight.compute_class_weight(
+#            'balanced',
+#             np.unique(y), 
+#             y)
+    
+#     train_class_weights = dict(enumerate(class_weights))
+    
+#     print("class_weights: ", train_class_weights)
+
+    
+    saver_callback = CustomSaver(
+        path_model,
+        name_model
+    )
+    
+    fit_history_our_model = our_model.fit(
+        train_dataset,
+        epochs=num_epochs,
+        # batch_size=batch_size,
+#         validation_data=val_dataset,
+#         class_weight=train_class_weights,
+        callbacks=[saver_callback]   
+    )
+    
+    evaluate_and_testing(our_model, path_model, test_data_path, class_name)
 
 
 # In[ ]:
@@ -334,12 +452,12 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     batch_size = 32
-    num_epochs = 10
-
+    num_epochs = 100
+    choosen_model = 2 # 1 == our model, 2 == resnet50, 3 == efficientnet
 
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     print("start: ", name_model)
-    base_learning_rate = 0.00002
+    base_learning_rate = 0.0003
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -349,50 +467,32 @@ if __name__ == "__main__":
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
-    # print(input_shape)
-
+    
     path_model = saved_model_path + name_model + "_model" + ".h5"
-    
-#     print(train_dataset)
-
-    our_model = build_our_model(input_shape, base_learning_rate, num_classes)
-
-#     our_model.summary()
-    
-    saver_callback = CustomSaver(
-        path_model,
-        name_model
-    )
     
     train_dataset, val_dataset = dataset_manipulation(train_data_path)
     
+    if choosen_model == 1:
+        """
+        our custom model
+        """ 
+        print("running", name_model, "-our_model")
+        our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     
-    print(train_dataset)
-
+    elif choosen_model == 2:
+        """
+        resnet50
+        """
+        print("running", name_model, "-resnet50")
+        our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
+        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     
-    y = np.concatenate([y for x, y in train_dataset], axis=0)
-    class_weights = class_weight.compute_class_weight(
-        class_weight='balanced',
-        classes=np.unique(y), 
-        y=y)
-    
-    train_class_weights = dict(enumerate(class_weights))
-    
-    print("class_weights: ", train_class_weights)
-    
-    fit_history = our_model.fit(
-        train_dataset,
-        epochs=num_epochs,
-        validation_data=val_dataset,
-        class_weight=train_class_weights,
-        callbacks=[saver_callback]   
-    )
-    
-    evaluate_and_testing(our_model, path_model, test_data_path, class_name)
-
-
-# In[ ]:
-
-
-
+    elif choosen_model == 3:
+        """
+        efficientnet
+        """
+        print("running", name_model, "-efficientnet")
+        our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
+        __run__(our_efficientnet, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
 
