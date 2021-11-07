@@ -401,6 +401,7 @@ def dataset_manipulation(train_data_path):
 #     print(len(list(train_dataset)))
     train_dataset_dict = {}
     top_number_of_dataset = 0
+    print("before preprocessing")
     for a in range(0, 8):
         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
         len_current_dataset = len(list(filtered_dataset))
@@ -409,7 +410,9 @@ def dataset_manipulation(train_data_path):
             filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
         train_dataset_dict[a] = filtered_dataset
-    
+        
+        
+    print("after preprocessing")
     final_dataset = train_dataset_dict[0]
     len_current_dataset = len(list(final_dataset))
     print("class: ", 0, len_current_dataset)
@@ -488,7 +491,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset/test_training_dataset"
+    train_data_path = "image_dataset/training_dataset"
     test_data_path = "image_dataset/evaluation_dataset"
     saved_model_path = "saved_model/"
     
