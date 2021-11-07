@@ -411,7 +411,11 @@ def dataset_manipulation(train_data_path):
         train_dataset_dict[a] = filtered_dataset
     
     final_dataset = train_dataset_dict[0]
+    len_current_dataset = len(list(final_dataset))
+    print("class: ", 0, len_current_dataset)
     for a in range (1, 8):
+        len_current_dataset = len(list(train_dataset_dict[a]))
+        print("class: ", a, len_current_dataset)
         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
     final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
@@ -467,7 +471,7 @@ if __name__ == "__main__":
     """ Set Hyper parameters """
     batch_size = 32
     num_epochs = 100
-    choosen_model = 3 # 1 == our model, 2 == resnet50, 3 == efficientnet
+    choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     
