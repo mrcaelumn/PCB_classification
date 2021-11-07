@@ -33,6 +33,8 @@ IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
+HIGH_CLASS = [0,1,3,4]
+LOW_CLASS = [2,5,6,7]
 AUTOTUNE = tf.data.AUTOTUNE
 
 
@@ -381,64 +383,58 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 # In[ ]:
 
 
-@tf.function
-def dataset_manipulation(high_dataset_path, low_dataset_path):
-    
-    high_dataset = tf.keras.utils.image_dataset_from_directory(
-        high_dataset_path,
+# @tf.function
+def dataset_manipulation(train_data_path):
+    train_dataset = tf.keras.utils.image_dataset_from_directory(
+        train_data_path,
 #         validation_split=0.2,
 #         subset="training",
 #         seed=123,
         image_size=(IMG_H, IMG_W))
-    
-    print("name of classes: ", high_dataset.class_names, ", Size of classes: ", len(high_dataset.class_names))
-    
-    low_dataset = tf.keras.utils.image_dataset_from_directory(
-        low_dataset_path,
-#         validation_split=0.2,
-#         subset="training",
-#         seed=123,
-        image_size=(IMG_H, IMG_W))
-    
-    print("name of classes: ", low_dataset.class_names, ", Size of classes: ", len(low_dataset.class_names))
-    
-    low_dataset = augment_dataset_batch_test(low_dataset)
-    
-    train_dataset = high_dataset.concatenate(low_dataset)
-    
-    
-    # class_names = train_dataset.class_names
-    # print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
-    
-#     valid_dataset = tf.keras.utils.image_dataset_from_directory(
-#         train_data_path,
-#         validation_split=0.2,
-#         subset="validation",
-#         seed=123,
-#         image_size=(IMG_H, IMG_W)
-#     )
 
-    # train_dataset = augment_dataset_batch_test(train_dataset)
-#     valid_dataset = augment_dataset_batch_test(valid_dataset)
+    class_names = train_dataset.class_names
+    print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
-    return train_dataset, None
-#     return train_dataset, valid_dataset
+    
+    
+    train_dataset = train_dataset.unbatch()
+#     print(len(list(train_dataset)))
+    train_dataset_dict = {}
+    top_number_of_dataset = 0
+    for a in range(0, 8):
+        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+        len_current_dataset = len(list(filtered_dataset))
+        print("class: ", a, len_current_dataset)
+        if a in LOW_CLASS:
+            filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+        
+        train_dataset_dict[a] = filtered_dataset
+    
+    final_dataset = train_dataset_dict[0]
+    for a in range (1, 8):
+        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+        
+    final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
+    
+    return final_dataset
 
 
 # In[ ]:
 
 
-def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size):
+def __run__(our_model, train_dataset, num_epochs, path_model, name_model, class_name, batch_size):
     
-#     y = np.concatenate([y for x, y in train_dataset], axis=0)
-#     class_weights = class_weight.compute_class_weight(
-#            'balanced',
-#             np.unique(y), 
-#             y)
+    y = np.concatenate([y for x, y in train_dataset], axis=0)
+    print(dict(zip(*np.unique(y, return_counts=True))))
+    class_weights = class_weight.compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(y), 
+        y=y
+    )
     
-#     train_class_weights = dict(enumerate(class_weights))
+    train_class_weights = dict(enumerate(class_weights))
     
-#     print("class_weights: ", train_class_weights)
+    print("class_weights: ", train_class_weights)
 
     
     saver_callback = CustomSaver(
@@ -450,7 +446,6 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         train_dataset,
         epochs=num_epochs,
         # batch_size=batch_size,
-#         validation_data=val_dataset,
 #         class_weight=train_class_weights,
         callbacks=[saver_callback]   
     )
@@ -489,8 +484,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path_high = "image_dataset/training_dataset/high"
-    train_data_path_low = "image_dataset/training_dataset/low"
+    train_data_path = "image_dataset/test_training_dataset"
     test_data_path = "image_dataset/evaluation_dataset"
     saved_model_path = "saved_model/"
     
@@ -498,7 +492,7 @@ if __name__ == "__main__":
     
     path_model = saved_model_path + name_model + "_model" + ".h5"
     
-    train_dataset, val_dataset = dataset_manipulation(train_data_path_high, train_data_path_low)
+    train_dataset = dataset_manipulation(train_data_path)
     
     if choosen_model == 1:
         """
@@ -507,19 +501,25 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
         # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_model, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     elif choosen_model == 2:
         """
         resnet50
         """
         print("running", name_model)
         our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_resnet50, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     elif choosen_model == 3:
         """
         efficientnet
         """
         print("running", name_model)
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_efficientnet, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_efficientnet, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+
+
+# In[ ]:
+
+
+
 
