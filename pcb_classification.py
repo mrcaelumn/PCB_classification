@@ -47,20 +47,16 @@ def augment_dataset_batch_test(dataset_batch):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
               num_parallel_calls=AUTOTUNE)
     
-    central_fraction = dataset_batch.map(lambda image, label: (tf.image.central_crop(image, central_fraction=0.1), label),
-              num_parallel_calls=AUTOTUNE)
-    
     adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
               num_parallel_calls=AUTOTUNE)
     
-#     rotate = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
-#               num_parallel_calls=AUTOTUNE)
+    adjust_saturation = dataset_batch.map(lambda image, label: (tf.image.adjust_saturation(image, 2), label),
+              num_parallel_calls=AUTOTUNE)
     
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    dataset_batch = dataset_batch.concatenate(central_fraction)
     dataset_batch = dataset_batch.concatenate(adjust_brightness)
-#     dataset_batch = dataset_batch.concatenate(rotate)
+    dataset_batch = dataset_batch.concatenate(adjust_saturation)
     
     return dataset_batch
 
@@ -385,18 +381,34 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 # In[ ]:
 
 
-# @tf.function
-def dataset_manipulation(train_data_path):
+@tf.function
+def dataset_manipulation(high_dataset_path, low_dataset_path):
     
-    train_dataset = tf.keras.utils.image_dataset_from_directory(
-        train_data_path,
+    high_dataset = tf.keras.utils.image_dataset_from_directory(
+        high_dataset_path,
 #         validation_split=0.2,
 #         subset="training",
 #         seed=123,
         image_size=(IMG_H, IMG_W))
-
-    class_names = train_dataset.class_names
-    print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
+    
+    print("name of classes: ", high_dataset.class_names, ", Size of classes: ", len(high_dataset.class_names))
+    
+    low_dataset = tf.keras.utils.image_dataset_from_directory(
+        low_dataset_path,
+#         validation_split=0.2,
+#         subset="training",
+#         seed=123,
+        image_size=(IMG_H, IMG_W))
+    
+    print("name of classes: ", low_dataset.class_names, ", Size of classes: ", len(low_dataset.class_names))
+    
+    low_dataset = augment_dataset_batch_test(low_dataset)
+    
+    train_dataset = high_dataset.concatenate(low_dataset)
+    
+    
+    # class_names = train_dataset.class_names
+    # print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
 #     valid_dataset = tf.keras.utils.image_dataset_from_directory(
 #         train_data_path,
@@ -406,7 +418,7 @@ def dataset_manipulation(train_data_path):
 #         image_size=(IMG_H, IMG_W)
 #     )
 
-    train_dataset = augment_dataset_batch_test(train_dataset)
+    # train_dataset = augment_dataset_batch_test(train_dataset)
 #     valid_dataset = augment_dataset_batch_test(valid_dataset)
     
     return train_dataset, None
@@ -477,7 +489,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset/training_dataset"
+    train_data_path_high = "image_dataset/training_dataset/high"
+    train_data_path_low = "image_dataset/training_dataset/low"
     test_data_path = "image_dataset/evaluation_dataset"
     saved_model_path = "saved_model/"
     
@@ -485,7 +498,7 @@ if __name__ == "__main__":
     
     path_model = saved_model_path + name_model + "_model" + ".h5"
     
-    train_dataset, val_dataset = dataset_manipulation(train_data_path)
+    train_dataset, val_dataset = dataset_manipulation(train_data_path_high, train_data_path_low)
     
     if choosen_model == 1:
         """
@@ -509,10 +522,4 @@ if __name__ == "__main__":
         print("running", name_model)
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
         __run__(our_efficientnet, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
-
-
-# In[ ]:
-
-
-
 
