@@ -259,10 +259,10 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     
     model.add(base_model)
     
-    model.add(tf.keras.layers.Dense(512))
+    # model.add(tf.keras.layers.Dense(512))
     # model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Dropout(0.5))
+    # model.add(tf.keras.layers.BatchNormalization())
+    # model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
@@ -299,7 +299,7 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     
     model.add(tf.keras.layers.Dense(512))
     # model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.BatchNormalization())
+    # model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
