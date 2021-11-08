@@ -43,26 +43,41 @@ AUTOTUNE = tf.data.AUTOTUNE
 # In[ ]:
 
 
+def color_jitter(image, brightness=0, contrast=0, saturation=0, hue=0):
+    """Distort the color of the image."""
+    with tf.name_scope('distort_color'):
+        if brightness > 0:
+            image = tf.image.random_brightness(image, max_delta=brightness)
+        if contrast > 0:
+            image = tf.image.random_contrast(image, lower=1-contrast, upper=1+contrast)
+        if saturation > 0:
+            image = tf.image.random_saturation(image, lower=1-saturation, upper=1+saturation)
+        if hue > 0:
+            image = tf.image.random_hue(image, max_delta=hue)
+    return image 
+
 def augment_dataset_batch_test(dataset_batch):
     
-    flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
-                                     num_parallel_calls=AUTOTUNE)
+#     flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
+#                                      num_parallel_calls=AUTOTUNE)
 
-    flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
-                                        num_parallel_calls=AUTOTUNE)
+#     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
+#                                         num_parallel_calls=AUTOTUNE)
     
 #     adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
 #               num_parallel_calls=AUTOTUNE)
     
 #     adjust_saturation = dataset_batch.map(lambda image, label: (tf.image.adjust_saturation(image, 2), label),
 #               num_parallel_calls=AUTOTUNE)
+    colour_jitter = dataset_batch.map(lambda image, label: (color_jitter(image), label),
+                                        num_parallel_calls=AUTOTUNE)
+    # rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
+    #                                       num_parallel_calls=AUTOTUNE)
     
-    rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
-                                          num_parallel_calls=AUTOTUNE)
-    
-    dataset_batch = dataset_batch.concatenate(flip_up_down)
-    dataset_batch = dataset_batch.concatenate(flip_left_right)
-    dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
+    # dataset_batch = dataset_batch.concatenate(flip_up_down)
+    # dataset_batch = dataset_batch.concatenate(flip_left_right)
+    dataset_batch = dataset_batch.concatenate(colour_jitter)
+    # dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
     # dataset_batch = dataset_batch.concatenate(adjust_brightness)
     # dataset_batch = dataset_batch.concatenate(adjust_saturation)
     
@@ -180,7 +195,7 @@ class CustomSaver(tf.keras.callbacks.Callback):
 # In[ ]:
 
 
-def build_our_model(i_shape, base_lr, n_class, augmentation=False):
+def build_our_model(i_shape, base_lr, n_class, augmentation=True):
     
     model = tf.keras.models.Sequential()
     
@@ -188,8 +203,6 @@ def build_our_model(i_shape, base_lr, n_class, augmentation=False):
     if augmentation:
         data_augmentation = tf.keras.Sequential([
             tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-            tf.keras.layers.RandomRotation(0.2),
-            tf.keras.layers.RandomZoom(0.2),
         ])
         model.add(data_augmentation)
         
@@ -241,10 +254,10 @@ def build_our_model(i_shape, base_lr, n_class, augmentation=False):
 # In[ ]:
 
 
-def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
+def our_resnet50(i_shape, base_lr, n_class, augmentation=True):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.ResNet50(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
+    base_model = tf.keras.applications.resnet_v2.ResNet50V2(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
     # base_model.summary()
     base_model.trainable = False
         
@@ -252,15 +265,14 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     if augmentation:
         data_augmentation = tf.keras.Sequential([
             tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-            tf.keras.layers.RandomRotation(0.2),
-            tf.keras.layers.RandomZoom(0.2),
         ])
         model.add(data_augmentation)    
     
     model.add(base_model)
     
-    # model.add(tf.keras.layers.Dense(512))
-    # model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.Dense(512))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
     # model.add(tf.keras.layers.BatchNormalization())
     # model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
@@ -275,7 +287,7 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
 # In[ ]:
 
 
-def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
+def our_efficientnet(i_shape, base_lr, n_class, augmentation=True):
     model = tf.keras.models.Sequential()
     
     base_model = tf.keras.applications.efficientnet.EfficientNetB7(input_shape = i_shape, include_top = False, weights = 'imagenet')
@@ -287,8 +299,6 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     if augmentation:
         data_augmentation = tf.keras.Sequential([
             tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-            tf.keras.layers.RandomRotation(0.2),
-            tf.keras.layers.RandomZoom(0.2),
         ])
         model.add(data_augmentation)
         
@@ -393,17 +403,29 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 def dataset_manipulation(train_data_path):
     train_dataset = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
-#         validation_split=0.2,
-#         subset="training",
-#         seed=123,
+        validation_split=0.15,
+        subset="training",
+        seed=123,
         image_size=(IMG_H, IMG_W))
 
+    
+    val_dataset = tf.keras.utils.image_dataset_from_directory(
+        train_data_path,
+        validation_split=0.15,
+        subset="validation",
+        seed=123,
+        image_size=(IMG_H, IMG_W))
+    
+    
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
     
-    final_dataset = augment_dataset_batch_test(train_dataset)
+    train_dataset = augment_dataset_batch_test(train_dataset)
+    val_dataset = augment_dataset_batch_test(val_dataset)
     
+    
+    return train_dataset, val_dataset
 #     train_dataset = train_dataset.unbatch()
     
 # #     print(len(list(train_dataset)))
@@ -431,13 +453,13 @@ def dataset_manipulation(train_data_path):
         
 #     final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
     
-    return final_dataset
+    # return final_dataset, None
 
 
 # In[ ]:
 
 
-def __run__(our_model, train_dataset, num_epochs, path_model, name_model, class_name, batch_size):
+def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size):
     
     y = np.concatenate([y for x, y in train_dataset], axis=0)
     print(dict(zip(*np.unique(y, return_counts=True))))
@@ -460,6 +482,7 @@ def __run__(our_model, train_dataset, num_epochs, path_model, name_model, class_
     fit_history_our_model = our_model.fit(
         train_dataset,
         epochs=num_epochs,
+        validation_data=val_dataset,
         # batch_size=batch_size,
 #         class_weight=train_class_weights,
         callbacks=[saver_callback]   
@@ -494,7 +517,7 @@ if __name__ == "__main__":
         name_model = name_model + "-efficientnet"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0003
+    base_learning_rate = 0.0001
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -507,7 +530,7 @@ if __name__ == "__main__":
     
     path_model = saved_model_path + name_model + "_model" + ".h5"
     
-    train_dataset = dataset_manipulation(train_data_path)
+    train_dataset, val_dataset = dataset_manipulation(train_data_path)
     
     if choosen_model == 1:
         """
@@ -516,21 +539,21 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
         # our_model.summary()
-        __run__(our_model, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     elif choosen_model == 2:
         """
         resnet50
         """
         print("running", name_model)
         our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_resnet50, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
     elif choosen_model == 3:
         """
         efficientnet
         """
         print("running", name_model)
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_efficientnet, train_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_efficientnet, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name, batch_size)
 
 
 # In[ ]:
