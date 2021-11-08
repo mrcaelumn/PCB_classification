@@ -16,6 +16,8 @@
 
 
 import tensorflow as tf
+import tensorflow_io as tfio
+
 import numpy as np
 import os
 import csv
@@ -44,21 +46,25 @@ AUTOTUNE = tf.data.AUTOTUNE
 def augment_dataset_batch_test(dataset_batch):
     
     flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
-              num_parallel_calls=AUTOTUNE)
+                                     num_parallel_calls=AUTOTUNE)
 
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
-              num_parallel_calls=AUTOTUNE)
+                                        num_parallel_calls=AUTOTUNE)
     
-    adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
-              num_parallel_calls=AUTOTUNE)
+#     adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
+#               num_parallel_calls=AUTOTUNE)
     
-    adjust_saturation = dataset_batch.map(lambda image, label: (tf.image.adjust_saturation(image, 2), label),
-              num_parallel_calls=AUTOTUNE)
+#     adjust_saturation = dataset_batch.map(lambda image, label: (tf.image.adjust_saturation(image, 2), label),
+#               num_parallel_calls=AUTOTUNE)
+    
+    rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
+                                          num_parallel_calls=AUTOTUNE)
     
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    dataset_batch = dataset_batch.concatenate(adjust_brightness)
-    dataset_batch = dataset_batch.concatenate(adjust_saturation)
+    dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
+    # dataset_batch = dataset_batch.concatenate(adjust_brightness)
+    # dataset_batch = dataset_batch.concatenate(adjust_saturation)
     
     return dataset_batch
 
@@ -257,7 +263,7 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
     # model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="sigmoid"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -272,7 +278,7 @@ def our_resnet50(i_shape, base_lr, n_class, augmentation=False):
 def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = 'imagenet')
+    base_model = tf.keras.applications.efficientnet.EfficientNetB7(input_shape = i_shape, include_top = False, weights = 'imagenet')
     # base_model.summary()
     base_model.trainable = False
         
@@ -295,7 +301,7 @@ def our_efficientnet(i_shape, base_lr, n_class, augmentation=False):
     # model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="sigmoid"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -396,32 +402,34 @@ def dataset_manipulation(train_data_path):
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
     
+    final_dataset = augment_dataset_batch_test(train_dataset)
     
-    train_dataset = train_dataset.unbatch()
-#     print(len(list(train_dataset)))
-    train_dataset_dict = {}
-    top_number_of_dataset = 0
-    print("before preprocessing")
-    for a in range(0, 8):
-        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-        len_current_dataset = len(list(filtered_dataset))
-        print("class: ", a, len_current_dataset)
-        if a in LOW_CLASS:
-            filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+#     train_dataset = train_dataset.unbatch()
+    
+# #     print(len(list(train_dataset)))
+#     train_dataset_dict = {}
+#     top_number_of_dataset = 0
+#     print("before preprocessing")
+#     for a in range(0, 8):
+#         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+#         len_current_dataset = len(list(filtered_dataset))
+#         print("class: ", a, len_current_dataset)
+#         if a in LOW_CLASS:
+#             filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
-        train_dataset_dict[a] = filtered_dataset
+#         train_dataset_dict[a] = filtered_dataset
         
         
-    print("after preprocessing")
-    final_dataset = train_dataset_dict[0]
-    len_current_dataset = len(list(final_dataset))
-    print("class: ", 0, len_current_dataset)
-    for a in range (1, 8):
-        len_current_dataset = len(list(train_dataset_dict[a]))
-        print("class: ", a, len_current_dataset)
-        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+#     print("after preprocessing")
+#     final_dataset = train_dataset_dict[0]
+#     len_current_dataset = len(list(final_dataset))
+#     print("class: ", 0, len_current_dataset)
+#     for a in range (1, 8):
+#         len_current_dataset = len(list(train_dataset_dict[a]))
+#         print("class: ", a, len_current_dataset)
+#         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
-    final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
+#     final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
     
     return final_dataset
 
@@ -491,8 +499,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset/training_dataset"
-    test_data_path = "image_dataset/evaluation_dataset"
+    train_data_path = "image_dataset_ori/training_dataset"
+    test_data_path = "image_dataset_ori/evaluation_dataset"
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
