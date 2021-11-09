@@ -557,6 +557,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         train_data_path,
         # validation_split=0.15,
         # subset="training",
+        batch_size=BATCH_SIZE,
         seed=123,
         color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
@@ -567,6 +568,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="validation",
         # seed=123,
+        batch_size=BATCH_SIZE,
         color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
     
