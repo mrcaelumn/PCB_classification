@@ -40,8 +40,8 @@ FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
-AUGMENTATION = False
-AUGMENTATION_REPEAT = True
+AUGMENTATION = True
+AUGMENTATION_REPEAT = False
 
 
 # In[ ]:
@@ -94,12 +94,14 @@ def enchantment_image(image):
     image = tf_clahe.clahe(image)
     
     return image
-    
-def enchantment_dataset(dataset_batch):
-    dataset_batch = dataset_batch.map(lambda image, label: (enchantment_image(image), label),
-                                     num_parallel_calls=AUTOTUNE)
-    return dataset_batch
 
+@tf.function
+def enchantment_dataset(dataset_batch):
+    final_dataset = dataset_batch.map(lambda image, label: (enchantment_image(image), label),
+                                     num_parallel_calls=AUTOTUNE)
+    return final_dataset
+
+@tf.function
 def augment_dataset_batch_test(dataset_batch):
     
     
@@ -542,6 +544,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 # @tf.function
 def dataset_manipulation(train_data_path, val_data_path):
+    
     train_dataset = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
         # validation_split=0.15,
@@ -572,11 +575,10 @@ def dataset_manipulation(train_data_path, val_data_path):
     #         plt.axis("off")
     # print(train_dataset)
     
-    train_dataset = enchantment_dataset(train_dataset)
-    val_dataset = enchantment_dataset(val_dataset)
+    print("enchantment_dataset")
+    enchantmented_train_dataset = enchantment_dataset(train_dataset)
+    enchantmented_val_dataset = enchantment_dataset(val_dataset)
     
-    train_dataset = train_dataset.cache()
-    val_dataset = val_dataset.cache()
 
     # print(train_dataset)
     # print("after: ")
@@ -596,39 +598,40 @@ def dataset_manipulation(train_data_path, val_data_path):
     #     val_dataset = augment_dataset_batch_test(val_dataset)
     
     
+    
     # return train_dataset, val_dataset
+    if AUGMENTATION_REPEAT:
+        print("AUGMENTATION_REPEAT")
+        train_dataset = enchantmented_train_dataset.unbatch()
 
-    train_dataset = train_dataset.unbatch()
-    
-#     print(len(list(train_dataset)))
-    train_dataset_dict = {}
-    top_number_of_dataset = 0
-    # print("before preprocessing")
-    for a in range(0, 8):
-        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-        len_current_dataset = len(list(filtered_dataset))
-        print("class: ", a, len_current_dataset)
-        if a in LOW_CLASS:
-            if AUGMENTATION_REPEAT:
+    #     print(len(list(train_dataset)))
+        train_dataset_dict = {}
+        top_number_of_dataset = 0
+        # print("before preprocessing")
+        for a in range(0, 8):
+            filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+            len_current_dataset = len(list(filtered_dataset))
+            print("class: ", a, len_current_dataset)
+            if a in LOW_CLASS:
                 filtered_dataset = augment_dataset_batch_test(filtered_dataset)
-        
-        train_dataset_dict[a] = filtered_dataset
-        
-        
-    # print("after preprocessing")
-    final_dataset = train_dataset_dict[0]
-    len_current_dataset = len(list(final_dataset))
-    print("class: ", 0, len_current_dataset)
-    for a in range (1, 8):
-        len_current_dataset = len(list(train_dataset_dict[a]))
-        print("class: ", a, len_current_dataset)
-        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
-        
-    final_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
+
+            train_dataset_dict[a] = filtered_dataset
+
+
+        # print("after preprocessing")
+        final_dataset = train_dataset_dict[0]
+        len_current_dataset = len(list(final_dataset))
+        print("class: ", 0, len_current_dataset)
+        for a in range (1, 8):
+            len_current_dataset = len(list(train_dataset_dict[a]))
+            print("class: ", a, len_current_dataset)
+            final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+
+        train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    final_dataset = final_dataset.cache().prefetch(buffer_size=AUTOTUNE)
-    val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
-    return final_dataset, val_dataset
+    train_dataset = train_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    val_dataset = enchantmented_val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    return train_dataset, val_dataset
 
 
 # In[ ]:
@@ -671,7 +674,10 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         validation_data=val_dataset,
         # batch_size=BATCH_SIZE,
 #         class_weight=train_class_weights,
-        callbacks=[saver_callback, lr_scheduler]   
+        callbacks=[
+            saver_callback, 
+            # lr_scheduler
+        ]   
     )
     
     evaluate_and_testing(our_model, path_model, test_data_path, class_name)
@@ -757,10 +763,4 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
         __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
-
-
-# In[ ]:
-
-
-
 
