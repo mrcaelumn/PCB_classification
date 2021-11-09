@@ -43,8 +43,8 @@ HIGH_CLASS = [0]
 MID_CLASS = [1, 4]
 LOW_CLASS = [2, 3, 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
-AUGMENTATION = False
-AUGMENTATION_REPEAT = True
+AUGMENTATION = True
+AUGMENTATION_REPEAT = False
 
 
 # In[ ]:
@@ -98,6 +98,10 @@ def enchantment_dataset(dataset_batch):
                                      num_parallel_calls=AUTOTUNE)
     return final_dataset
 
+
+# In[ ]:
+
+
 def augment_dataset_batch_test(dataset_batch, random_aug=True):
     
     noise = tf.random.normal(shape=(IMG_H, IMG_W, IMG_C), mean=0.0, stddev=1.0,dtype=tf.float32)
@@ -113,6 +117,7 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
                                         num_parallel_calls=AUTOTUNE)
     
     if random_aug:
+        
         random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
                                          num_parallel_calls=AUTOTUNE)
 
@@ -135,10 +140,7 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
 
         dataset_batch = dataset_batch.concatenate(rot_90)
         dataset_batch = dataset_batch.concatenate(rot_180)
-    
-    
 
-    
     return dataset_batch
 
 
@@ -150,9 +152,8 @@ Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomFlip("horizontal_and_vertical", input_shape=(IMG_H, IMG_W, IMG_C)),
-    #tf.keras.layers.Lambda(random_color_jitter),
-    #tf.keras.layers.Lambda(random_rgb_to_bgr),
-    # tf.keras.layers.Lambda(random_hue),
+    tf.keras.layers.RandomContrast(0.2),
+    tf.keras.layers.GaussianNoise(0.1),
 ])
 
 
@@ -312,7 +313,7 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -372,7 +373,7 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     model.add(dense_block(512, 0.5))
     model.add(dense_block(256, 0.3))
     
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -400,7 +401,7 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Dense(128, activation = 'relu'))
     model.add(tf.keras.layers.Dropout(0.2))
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -428,7 +429,7 @@ def our_efficientnet(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -460,7 +461,7 @@ def our_desnet(i_shape, base_lr, n_class):
     # model.add(tf.keras.layers.LeakyReLU())
     # model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -556,7 +557,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         train_data_path,
         # validation_split=0.15,
         # subset="training",
-        # seed=123,
+        seed=123,
         color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
 
@@ -610,36 +611,36 @@ def dataset_manipulation(train_data_path, val_data_path):
     
     
     # return train_dataset, val_dataset
-    if AUGMENTATION_REPEAT:
-        print("AUGMENTATION_REPEAT")
-        train_dataset = train_dataset.unbatch()
+#     if AUGMENTATION_REPEAT:
+#         print("AUGMENTATION_REPEAT")
+#         train_dataset = train_dataset.unbatch()
 
-    #     print(len(list(train_dataset)))
-        train_dataset_dict = {}
-        top_number_of_dataset = 0
-        # print("before preprocessing")
-        for a in range(0, 8):
-            filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-            len_current_dataset = len(list(filtered_dataset))
-            print("class: ", a, len_current_dataset)
-            if a in LOW_CLASS:
-                filtered_dataset = augment_dataset_batch_test(filtered_dataset)
-            elif a in MID_CLASS:
-                filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
+#     #     print(len(list(train_dataset)))
+#         train_dataset_dict = {}
+#         top_number_of_dataset = 0
+#         # print("before preprocessing")
+#         for a in range(0, 8):
+#             filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+#             len_current_dataset = len(list(filtered_dataset))
+#             print("class: ", a, len_current_dataset)
+#             if a in LOW_CLASS:
+#                 filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+#             elif a in MID_CLASS:
+#                 filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
 
-            train_dataset_dict[a] = filtered_dataset
+#             train_dataset_dict[a] = filtered_dataset
 
 
-        print("===========================================")
-        final_dataset = train_dataset_dict[0]
-        len_current_dataset = len(list(final_dataset))
-        print("class: ", 0, len_current_dataset)
-        for a in range (1, 8):
-            len_current_dataset = len(list(train_dataset_dict[a]))
-            print("class: ", a, len_current_dataset)
-            final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+#         print("===========================================")
+#         final_dataset = train_dataset_dict[0]
+#         len_current_dataset = len(list(final_dataset))
+#         print("class: ", 0, len_current_dataset)
+#         for a in range (1, 8):
+#             len_current_dataset = len(list(train_dataset_dict[a]))
+#             print("class: ", a, len_current_dataset)
+#             final_dataset = final_dataset.concatenate(train_dataset_dict[a])
 
-        train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
+#         train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
     return train_dataset, val_dataset
 
@@ -727,8 +728,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_ori/training_dataset"
-    test_data_path = "image_dataset_ori/evaluation_dataset"
+    train_data_path = "image_dataset_over/training_dataset"
+    test_data_path = "image_dataset_over/evaluation_dataset"
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
