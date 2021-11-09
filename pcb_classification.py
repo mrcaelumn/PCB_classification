@@ -224,7 +224,7 @@ class CustomSaver(tf.keras.callbacks.Callback):
         self.epochs_list.append(epoch)
         self.custom_loss.append(logs["loss"])
 
-        if (epoch + 1) % 15 == 0 or (epoch + 1) <= 15:
+        if (epoch + 1) % 15 == 0:
             self.model.save(self.model_path)
             print('saved for epoch',epoch + 1)
 
@@ -702,7 +702,7 @@ if __name__ == "__main__":
         __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
     elif choosen_model == 5:
         """
-        desnet
+        our custom model v2
         """
         print("running", name_model)
         our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
