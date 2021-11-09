@@ -40,7 +40,8 @@ COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
-LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
+MID_CLASS = [1, 4]
+LOW_CLASS = [2, 3, 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
 AUGMENTATION_REPEAT = True
@@ -81,14 +82,14 @@ def random_hue(tensor):
     return tensor
 
 def enchantment_image(image):
-    image = tf.cast(image, tf.float32)
-    image = image / 255.0 # range 0 to 1
     # image = tf.image.rgb_to_grayscale(image)
-    
+    image = tfa.image.equalize(image)
     if COLOUR_MODE != "rgb":
         image = tf.image.grayscale_to_rgb(image)
     # image = tf_clahe.clahe(image)
-    image = tfa.image.equalize(image)
+    
+    image = tf.cast(image, tf.float32)
+    image = image / 255.0 # range 0 to 1
     
     return image
 
@@ -97,7 +98,7 @@ def enchantment_dataset(dataset_batch):
                                      num_parallel_calls=AUTOTUNE)
     return final_dataset
 
-def augment_dataset_batch_test(dataset_batch):
+def augment_dataset_batch_test(dataset_batch, random_aug=True):
     
     noise = tf.random.normal(shape=(IMG_H, IMG_W, IMG_C), mean=0.0, stddev=1.0,dtype=tf.float32)
     
@@ -108,18 +109,18 @@ def augment_dataset_batch_test(dataset_batch):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
-    
-    random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
-                                     num_parallel_calls=AUTOTUNE)
+    if random_aug:
+        random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
+                                         num_parallel_calls=AUTOTUNE)
 
-    random_flip_left_right = dataset_batch.map(lambda image, label: (tf.image.random_flip_left_right(image), label),
-                                        num_parallel_calls=AUTOTUNE)
-    
-    rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
-                                     num_parallel_calls=AUTOTUNE)
+        random_flip_left_right = dataset_batch.map(lambda image, label: (tf.image.random_flip_left_right(image), label),
+                                            num_parallel_calls=AUTOTUNE)
 
-    rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
-                                        num_parallel_calls=AUTOTUNE)
+        rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
+                                         num_parallel_calls=AUTOTUNE)
+
+        rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
+                                            num_parallel_calls=AUTOTUNE)
     
     noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
                                         num_parallel_calls=AUTOTUNE)
@@ -272,7 +273,7 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'), input_shape=(IMG_H, IMG_W, IMG_C))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
@@ -622,11 +623,13 @@ def dataset_manipulation(train_data_path, val_data_path):
             print("class: ", a, len_current_dataset)
             if a in LOW_CLASS:
                 filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+            elif a in MID_CLASS:
+                filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
 
             train_dataset_dict[a] = filtered_dataset
 
 
-        # print("after preprocessing")
+        print("===========================================")
         final_dataset = train_dataset_dict[0]
         len_current_dataset = len(list(final_dataset))
         print("class: ", 0, len_current_dataset)
