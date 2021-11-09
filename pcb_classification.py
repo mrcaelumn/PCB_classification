@@ -296,8 +296,10 @@ def build_our_model(i_shape, base_lr, n_class):
 
 def conv_block(filters):
     block = tf.keras.Sequential([
-        tf.keras.layers.SeparableConv2D(filters, 3, activation='relu', padding='same'),
-        tf.keras.layers.SeparableConv2D(filters, 3, activation='relu', padding='same'),
+        tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
+        tf.keras.layers.LeakyReLU(),
+        tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
+        tf.keras.layers.LeakyReLU()
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.MaxPool2D()
     ])
@@ -306,7 +308,8 @@ def conv_block(filters):
 
 def dense_block(units, dropout_rate):
     block = tf.keras.Sequential([
-        tf.keras.layers.Dense(units, activation='relu'),
+        tf.keras.layers.Dense(units),
+        tf.keras.layers.LeakyReLU(),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Dropout(dropout_rate)
     ])
@@ -663,7 +666,7 @@ if __name__ == "__main__":
         name_model = name_model + "-custom_model_v2"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0001
+    base_learning_rate = 0.00002
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
