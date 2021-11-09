@@ -602,14 +602,14 @@ def dataset_manipulation(train_data_path, val_data_path):
     # return train_dataset, val_dataset
     if AUGMENTATION_REPEAT:
         print("AUGMENTATION_REPEAT")
-        train_dataset = enchantmented_train_dataset.unbatch()
+        enchantmented_train_dataset = enchantmented_train_dataset.unbatch()
 
     #     print(len(list(train_dataset)))
         train_dataset_dict = {}
         top_number_of_dataset = 0
         # print("before preprocessing")
         for a in range(0, 8):
-            filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+            filtered_dataset = enchantmented_train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
             len_current_dataset = len(list(filtered_dataset))
             print("class: ", a, len_current_dataset)
             if a in LOW_CLASS:
@@ -627,9 +627,9 @@ def dataset_manipulation(train_data_path, val_data_path):
             print("class: ", a, len_current_dataset)
             final_dataset = final_dataset.concatenate(train_dataset_dict[a])
 
-        train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
+        enchantmented_train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    train_dataset = train_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    train_dataset = enchantmented_train_dataset.cache().prefetch(buffer_size=AUTOTUNE)
     val_dataset = enchantmented_val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
     return train_dataset, val_dataset
 
