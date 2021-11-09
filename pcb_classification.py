@@ -41,7 +41,7 @@ HIGH_CLASS = [0]
 LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
-AUGMENTATION_REPEAT = False
+AUGMENTATION_REPEAT = True
 
 
 # In[ ]:
@@ -85,6 +85,7 @@ def rescale_dataset(image, label):
 
 # def gray_to_rgb(img):
 #     return np.repeat(img, 3, 2)
+@tf.function
 def enchantment_image(image):
     image = tf.cast(image, tf.float32)
     image = (image / 255.0) # range 0 to 1
@@ -574,6 +575,9 @@ def dataset_manipulation(train_data_path, val_data_path):
     train_dataset = enchantment_dataset(train_dataset)
     val_dataset = enchantment_dataset(val_dataset)
     
+    train_dataset = train_dataset.cache()
+    val_dataset = val_dataset.cache()
+
     # print(train_dataset)
     # print("after: ")
     # plt.figure(figsize=(10, 10))
@@ -605,7 +609,8 @@ def dataset_manipulation(train_data_path, val_data_path):
         len_current_dataset = len(list(filtered_dataset))
         print("class: ", a, len_current_dataset)
         if a in LOW_CLASS:
-            filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+            if AUGMENTATION_REPEAT:
+                filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
         train_dataset_dict[a] = filtered_dataset
         
@@ -621,9 +626,9 @@ def dataset_manipulation(train_data_path, val_data_path):
         
     final_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    train_dataset = final_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    final_dataset = final_dataset.cache().prefetch(buffer_size=AUTOTUNE)
     val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
-    return train_dataset, val_dataset
+    return final_dataset, val_dataset
 
 
 # In[ ]:
