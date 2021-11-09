@@ -33,8 +33,8 @@ from matplotlib import pyplot as plt
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
-IMG_H = 224
-IMG_W = 224
+IMG_H = 150
+IMG_W = 100
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
@@ -323,27 +323,6 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def conv_block(filters):
-    block = tf.keras.Sequential([
-        tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
-        tf.keras.layers.LeakyReLU(),
-        tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
-        tf.keras.layers.LeakyReLU(),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.MaxPool2D()
-    ])
-    
-    return block
-
-def dense_block(units, dropout_rate):
-    block = tf.keras.Sequential([
-        tf.keras.layers.Dense(units),
-        tf.keras.layers.LeakyReLU(),
-        tf.keras.layers.BatchNormalization(),
-        tf.keras.layers.Dropout(dropout_rate)
-    ])
-    
-    return block
 
 def build_our_model_v2(i_shape, base_lr, n_class):
     
@@ -352,26 +331,24 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.MaxPooling2D())
+    
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     
-    model.add(conv_block(64))
-    model.add(conv_block(128))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.MaxPooling2D())
     
-    model.add(conv_block(256))
-    model.add(tf.keras.layers.Dropout(0.2))
-    
-    model.add(conv_block(512))
     model.add(tf.keras.layers.Dropout(0.2))
     
     model.add(tf.keras.layers.Flatten())
-    
-    model.add(dense_block(1024, 0.7))
-    model.add(dense_block(512, 0.5))
-    model.add(dense_block(256, 0.3))
+    model.add(tf.keras.layers.Dense(256))
+    model.add(tf.keras.layers.LeakyReLU())
+
     
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
