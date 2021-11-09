@@ -21,7 +21,8 @@ import tensorflow_io as tfio
 import numpy as np
 import os
 import csv
-     
+import tf_clahe
+
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.utils import class_weight
@@ -39,7 +40,7 @@ FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
-AUGMENTATION = True
+AUGMENTATION = False
 AUGMENTATION_REPEAT = False
 
 
@@ -82,30 +83,46 @@ def rescale_dataset(image, label):
     image = (image / 255.0)
     return image, label
 
+# def gray_to_rgb(img):
+#     return np.repeat(img, 3, 2)
+def enchantment_image(image):
+    image = tf.cast(image, tf.float32)
+    # image = tf.image.rgb_to_grayscale(image)
+    image = tf.image.grayscale_to_rgb(image)
+    image = tf_clahe.clahe(image)
+    
+    return image
+    
+def enchantment_dataset(dataset_batch):
+    dataset_batch = dataset_batch.map(lambda image, label: (enchantment_image(image), label),
+                                     num_parallel_calls=AUTOTUNE)
+    return dataset_batch
+
 def augment_dataset_batch_test(dataset_batch):
     
-#     flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
-#                                      num_parallel_calls=AUTOTUNE)
+    
+    flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
+                                     num_parallel_calls=AUTOTUNE)
 
-#     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
+    flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
+                                        num_parallel_calls=AUTOTUNE)
+    
+#     rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
 #                                         num_parallel_calls=AUTOTUNE)
     
-    rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
-                                        num_parallel_calls=AUTOTUNE)
-    
-    rgb_to_xyz = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_xyz(image), label),
-                                        num_parallel_calls=AUTOTUNE)
+#     rgb_to_xyz = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_xyz(image), label),
+#                                         num_parallel_calls=AUTOTUNE)
     
     # rgb_to_ycbcr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_ycbcr(image), label),
     #                                     num_parallel_calls=AUTOTUNE)
     # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
     #                                       num_parallel_calls=AUTOTUNE)
     
-    # dataset_batch = dataset_batch.concatenate(flip_up_down)
-    # dataset_batch = dataset_batch.concatenate(flip_left_right)
+    dataset_batch = dataset_batch.concatenate(flip_up_down)
+    dataset_batch = dataset_batch.concatenate(flip_left_right)
     # dataset_batch = dataset_batch.concatenate(colour_jitter)
-    dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
-    dataset_batch = dataset_batch.concatenate(rgb_to_xyz)
+    # dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
+    # dataset_batch = dataset_batch.concatenate(rgb_to_xyz)
     # dataset_batch = dataset_batch.concatenate(rgb_to_ycbcr)
     # dataset_batch = dataset_batch.concatenate(random_hue)
     # dataset_batch = dataset_batch.concatenate(adjust_brightness)
@@ -323,7 +340,7 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=i_shape))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
@@ -453,10 +470,11 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
         test_dataset_path,
 #         seed=123,
         image_size=(IMG_H, IMG_W),
+        color_mode="grayscale",
         batch_size=BATCH_SIZE
     )
     
-    
+    evaluation_ds = enchantment_image(evaluation_ds)
     # Evaluate the model on the test data using `evaluate`
     # You can also evaluate or predict on a dataset.
     print("Evaluate")
@@ -527,6 +545,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="training",
         # seed=123,
+        color_mode="grayscale",
         image_size=(IMG_H, IMG_W))
 
     
@@ -535,29 +554,42 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="validation",
         # seed=123,
+        color_mode="grayscale",
         image_size=(IMG_H, IMG_W))
-    
     
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
-    if AUGMENTATION_REPEAT:
-        train_dataset = augment_dataset_batch_test(train_dataset)
-        val_dataset = augment_dataset_batch_test(val_dataset)
+    # print("Before: ")
+    # plt.figure(figsize=(10, 10))
+    # for images, labels in train_dataset.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3,i+1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.title(class_names[labels[i]])
+    #         plt.axis("off")
+    # print(train_dataset)
     
-    train_dataset = (train_dataset
-                     # .shuffle(1000)
-                     .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
-                     # .batch(BATCH_SIZE)
-                     .prefetch(AUTOTUNE)
-                    )
+    train_dataset = enchantment_dataset(train_dataset)
+    val_dataset = enchantment_dataset(val_dataset)
     
-    val_dataset = (
-        val_dataset
-        .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
-        # .batch(BATCH_SIZE)
-        .prefetch(AUTOTUNE)
-    )
+    # print(train_dataset)
+    # print("after: ")
+    # plt.figure(figsize=(10, 10))
+    # for images, labels in train_dataset.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i+1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.title(class_names[labels[i]])
+    #         plt.axis("off")
+    
+    
+    
+    
+    # if AUGMENTATION_REPEAT:
+    #     train_dataset = augment_dataset_batch_test(train_dataset)
+    #     val_dataset = augment_dataset_batch_test(val_dataset)
+    
     
     # return train_dataset, val_dataset
 
@@ -566,29 +598,29 @@ def dataset_manipulation(train_data_path, val_data_path):
 #     print(len(list(train_dataset)))
     train_dataset_dict = {}
     top_number_of_dataset = 0
-    print("before preprocessing")
+    # print("before preprocessing")
     for a in range(0, 8):
         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
         len_current_dataset = len(list(filtered_dataset))
-        print("class: ", a, len_current_dataset)
+        # print("class: ", a, len_current_dataset)
         if a in LOW_CLASS:
             filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
         train_dataset_dict[a] = filtered_dataset
         
         
-    print("after preprocessing")
+    # print("after preprocessing")
     final_dataset = train_dataset_dict[0]
     len_current_dataset = len(list(final_dataset))
-    print("class: ", 0, len_current_dataset)
+    # print("class: ", 0, len_current_dataset)
     for a in range (1, 8):
         len_current_dataset = len(list(train_dataset_dict[a]))
-        print("class: ", a, len_current_dataset)
+        # print("class: ", a, len_current_dataset)
         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
     final_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    final_dataset = (final_dataset
+    train_dataset = (final_dataset
                      # .shuffle(1000)
                      .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
                      # .batch(BATCH_SIZE)
@@ -601,8 +633,9 @@ def dataset_manipulation(train_data_path, val_data_path):
         # .batch(BATCH_SIZE)
         .prefetch(AUTOTUNE)
     )
-    
-    return final_dataset, val_dataset
+    train_dataset = train_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    return train_dataset, val_dataset
 
 
 # In[ ]:
