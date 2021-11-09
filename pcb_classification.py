@@ -85,7 +85,7 @@ def rescale_dataset(image, label):
 
 # def gray_to_rgb(img):
 #     return np.repeat(img, 3, 2)
-@tf.function
+
 def enchantment_image(image):
     image = tf.cast(image, tf.float32)
     image = (image / 255.0) # range 0 to 1
@@ -95,7 +95,6 @@ def enchantment_image(image):
     
     return image
 
-@tf.function
 def enchantment_dataset(dataset_batch):
     final_dataset = dataset_batch.map(lambda image, label: (enchantment_image(image), label),
                                      num_parallel_calls=AUTOTUNE)
@@ -142,7 +141,7 @@ def augment_dataset_batch_test(dataset_batch):
 Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
-    tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+    tf.keras.layers.RandomFlip("horizontal_and_vertical", input_shape=(IMG_H, IMG_W, IMG_C)),
     #tf.keras.layers.Lambda(random_color_jitter),
     #tf.keras.layers.Lambda(random_rgb_to_bgr),
     # tf.keras.layers.Lambda(random_hue),
@@ -344,7 +343,7 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=i_shape))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
