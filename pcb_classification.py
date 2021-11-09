@@ -275,31 +275,31 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.2))
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.3))
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(256, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(256, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
@@ -307,7 +307,7 @@ def build_our_model(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Flatten())
 
-    model.add(tf.keras.layers.Dense(512))
+    model.add(tf.keras.layers.Dense(1024))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
