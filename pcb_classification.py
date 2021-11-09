@@ -87,6 +87,7 @@ def rescale_dataset(image, label):
 #     return np.repeat(img, 3, 2)
 def enchantment_image(image):
     image = tf.cast(image, tf.float32)
+    image = (image / 255.0) # range 0 to 1
     # image = tf.image.rgb_to_grayscale(image)
     image = tf.image.grayscale_to_rgb(image)
     image = tf_clahe.clahe(image)
@@ -602,7 +603,7 @@ def dataset_manipulation(train_data_path, val_data_path):
     for a in range(0, 8):
         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
         len_current_dataset = len(list(filtered_dataset))
-        # print("class: ", a, len_current_dataset)
+        print("class: ", a, len_current_dataset)
         if a in LOW_CLASS:
             filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
@@ -612,28 +613,15 @@ def dataset_manipulation(train_data_path, val_data_path):
     # print("after preprocessing")
     final_dataset = train_dataset_dict[0]
     len_current_dataset = len(list(final_dataset))
-    # print("class: ", 0, len_current_dataset)
+    print("class: ", 0, len_current_dataset)
     for a in range (1, 8):
         len_current_dataset = len(list(train_dataset_dict[a]))
-        # print("class: ", a, len_current_dataset)
+        print("class: ", a, len_current_dataset)
         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
     final_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    train_dataset = (final_dataset
-                     # .shuffle(1000)
-                     .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
-                     # .batch(BATCH_SIZE)
-                     .prefetch(AUTOTUNE)
-                    )
-    
-    val_dataset = (
-        val_dataset
-        .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
-        # .batch(BATCH_SIZE)
-        .prefetch(AUTOTUNE)
-    )
-    train_dataset = train_dataset.cache().prefetch(buffer_size=AUTOTUNE)
+    train_dataset = final_dataset.cache().prefetch(buffer_size=AUTOTUNE)
     val_dataset = val_dataset.cache().prefetch(buffer_size=AUTOTUNE)
     return train_dataset, val_dataset
 
