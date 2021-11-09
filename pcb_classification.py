@@ -93,7 +93,6 @@ def enchantment_dataset(dataset_batch):
                                      num_parallel_calls=AUTOTUNE)
     return final_dataset
 
-@tf.function
 def augment_dataset_batch_test(dataset_batch):
     
     
