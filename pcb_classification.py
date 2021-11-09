@@ -36,11 +36,11 @@ IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
-HIGH_CLASS = [0,1,3,4]
-LOW_CLASS = [2,5,6,7]
+HIGH_CLASS = [0]
+LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = True
-AUGMENTATION_REPEAT = True
+AUGMENTATION_REPEAT = False
 
 
 # In[ ]:
@@ -96,8 +96,8 @@ def augment_dataset_batch_test(dataset_batch):
     rgb_to_xyz = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_xyz(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
-    rgb_to_ycbcr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_ycbcr(image), label),
-                                        num_parallel_calls=AUTOTUNE)
+    # rgb_to_ycbcr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_ycbcr(image), label),
+    #                                     num_parallel_calls=AUTOTUNE)
     # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
     #                                       num_parallel_calls=AUTOTUNE)
     
@@ -106,7 +106,7 @@ def augment_dataset_batch_test(dataset_batch):
     # dataset_batch = dataset_batch.concatenate(colour_jitter)
     dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
     dataset_batch = dataset_batch.concatenate(rgb_to_xyz)
-    dataset_batch = dataset_batch.concatenate(rgb_to_ycbcr)
+    # dataset_batch = dataset_batch.concatenate(rgb_to_ycbcr)
     # dataset_batch = dataset_batch.concatenate(random_hue)
     # dataset_batch = dataset_batch.concatenate(adjust_brightness)
     # dataset_batch = dataset_batch.concatenate(adjust_saturation)
@@ -559,36 +559,50 @@ def dataset_manipulation(train_data_path, val_data_path):
         .prefetch(AUTOTUNE)
     )
     
-    return train_dataset, val_dataset
+    # return train_dataset, val_dataset
 
-#     train_dataset = train_dataset.unbatch()
+    train_dataset = train_dataset.unbatch()
     
-# #     print(len(list(train_dataset)))
-#     train_dataset_dict = {}
-#     top_number_of_dataset = 0
-#     print("before preprocessing")
-#     for a in range(0, 8):
-#         filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-#         len_current_dataset = len(list(filtered_dataset))
-#         print("class: ", a, len_current_dataset)
-#         if a in LOW_CLASS:
-#             filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+#     print(len(list(train_dataset)))
+    train_dataset_dict = {}
+    top_number_of_dataset = 0
+    print("before preprocessing")
+    for a in range(0, 8):
+        filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+        len_current_dataset = len(list(filtered_dataset))
+        print("class: ", a, len_current_dataset)
+        if a in LOW_CLASS:
+            filtered_dataset = augment_dataset_batch_test(filtered_dataset)
         
-#         train_dataset_dict[a] = filtered_dataset
+        train_dataset_dict[a] = filtered_dataset
         
         
-#     print("after preprocessing")
-#     final_dataset = train_dataset_dict[0]
-#     len_current_dataset = len(list(final_dataset))
-#     print("class: ", 0, len_current_dataset)
-#     for a in range (1, 8):
-#         len_current_dataset = len(list(train_dataset_dict[a]))
-#         print("class: ", a, len_current_dataset)
-#         final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+    print("after preprocessing")
+    final_dataset = train_dataset_dict[0]
+    len_current_dataset = len(list(final_dataset))
+    print("class: ", 0, len_current_dataset)
+    for a in range (1, 8):
+        len_current_dataset = len(list(train_dataset_dict[a]))
+        print("class: ", a, len_current_dataset)
+        final_dataset = final_dataset.concatenate(train_dataset_dict[a])
         
-#     final_dataset = final_dataset.batch(32).prefetch(AUTOTUNE)
+    final_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
-    # return final_dataset, None
+    final_dataset = (final_dataset
+                     # .shuffle(1000)
+                     .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
+                     # .batch(BATCH_SIZE)
+                     .prefetch(AUTOTUNE)
+                    )
+    
+    val_dataset = (
+        val_dataset
+        .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
+        # .batch(BATCH_SIZE)
+        .prefetch(AUTOTUNE)
+    )
+    
+    return final_dataset, val_dataset
 
 
 # In[ ]:
