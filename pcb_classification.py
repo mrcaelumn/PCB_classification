@@ -35,6 +35,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
+COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
@@ -78,17 +79,9 @@ def random_hue(tensor):
         tensor = tf.image.random_hue(tensor, 0.2)
     return tensor
 
-def rescale_dataset(image, label):
-    image = tf.cast(image, tf.float32)
-    image = (image / 255.0)
-    return image, label
-
-# def gray_to_rgb(img):
-#     return np.repeat(img, 3, 2)
-
 def enchantment_image(image):
     image = tf.cast(image, tf.float32)
-    image = (image / 255.0) # range 0 to 1
+    image = image / 255.0 # range 0 to 1
     # image = tf.image.rgb_to_grayscale(image)
     image = tf.image.grayscale_to_rgb(image)
     image = tf_clahe.clahe(image)
@@ -364,9 +357,9 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     model.add(dense_block(512, 0.5))
     model.add(dense_block(256, 0.3))
     
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+    model.compile(loss='categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -392,9 +385,9 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Dense(128, activation = 'relu'))
     model.add(tf.keras.layers.Dropout(0.2))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    model.compile(loss='categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -420,9 +413,9 @@ def our_efficientnet(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    model.compile(loss='categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -452,9 +445,9 @@ def our_desnet(i_shape, base_lr, n_class):
     # model.add(tf.keras.layers.LeakyReLU())
     # model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    model.compile(loss='categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -473,7 +466,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
         test_dataset_path,
 #         seed=123,
         image_size=(IMG_H, IMG_W),
-        color_mode="grayscale",
+        color_mode=COLOUR_MODE,
         batch_size=BATCH_SIZE
     )
     
@@ -494,8 +487,8 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     label_list = []
     
     probability_model = tf.keras.Sequential([
-        tf.keras.layers.Rescaling(scale=1./255, input_shape=(IMG_H, IMG_W, IMG_C)), 
-        this_model
+        # tf.keras.layers.Rescaling(scale=1./255, input_shape=(IMG_H, IMG_W, IMG_C)), 
+        this_model,
     ])
     for class_n in c_names:
         path = os.path.join(test_dataset_path, class_n)
@@ -549,7 +542,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="training",
         # seed=123,
-        color_mode="grayscale",
+        color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
 
     
@@ -558,7 +551,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="validation",
         # seed=123,
-        color_mode="grayscale",
+        color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
     
     class_names = train_dataset.class_names
@@ -569,23 +562,26 @@ def dataset_manipulation(train_data_path, val_data_path):
     # for images, labels in train_dataset.take(1):
     #     for i in range(9):
     #         ax = plt.subplot(3, 3,i+1)
-    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.imshow(images[i])
     #         plt.title(class_names[labels[i]])
     #         plt.axis("off")
     # print(train_dataset)
     
-    print("enchantment_dataset")
+    
     train_dataset = enchantment_dataset(train_dataset)
     val_dataset = enchantment_dataset(val_dataset)
     
-
+    train_dataset = augment_dataset_batch_test(train_dataset)
+    
+    print("enchantment_dataset")
+    
     # print(train_dataset)
     # print("after: ")
     # plt.figure(figsize=(10, 10))
     # for images, labels in train_dataset.take(1):
     #     for i in range(9):
     #         ax = plt.subplot(3, 3, i+1)
-    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.imshow(images[i])
     #         plt.title(class_names[labels[i]])
     #         plt.axis("off")
     
@@ -724,40 +720,40 @@ if __name__ == "__main__":
     
     train_dataset, val_dataset = dataset_manipulation(train_data_path, test_data_path)
     
-    if choosen_model == 1:
-        """
-        our custom model
-        """ 
-        print("running", name_model)
-        our_model = build_our_model(input_shape, base_learning_rate, num_classes)
-        # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 2:
-        """
-        resnet50
-        """
-        print("running", name_model)
-        our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 3:
-        """
-        efficientnet
-        """
-        print("running", name_model)
-        our_model = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 4:
-        """
-        desnet
-        """
-        print("running", name_model)
-        our_model = our_desnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 5:
-        """
-        our custom model v2
-        """
-        print("running", name_model)
-        our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+    # if choosen_model == 1:
+    #     """
+    #     our custom model
+    #     """ 
+    #     print("running", name_model)
+    #     our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+    #     # our_model.summary()
+    #     __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+    # elif choosen_model == 2:
+    #     """
+    #     resnet50
+    #     """
+    #     print("running", name_model)
+    #     our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
+    #     __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+    # elif choosen_model == 3:
+    #     """
+    #     efficientnet
+    #     """
+    #     print("running", name_model)
+    #     our_model = our_efficientnet(input_shape, base_learning_rate, num_classes)
+    #     __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+    # elif choosen_model == 4:
+    #     """
+    #     desnet
+    #     """
+    #     print("running", name_model)
+    #     our_model = our_desnet(input_shape, base_learning_rate, num_classes)
+    #     __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+    # elif choosen_model == 5:
+    #     """
+    #     our custom model v2
+    #     """
+    #     print("running", name_model)
+    #     our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
+    #     __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
 
