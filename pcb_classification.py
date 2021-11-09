@@ -34,6 +34,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
+BATCH_SIZE = 64
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0,1,3,4]
 LOW_CLASS = [2,5,6,7]
@@ -62,7 +63,11 @@ def random_color_jitter(tensor):
         tensor = color_jitter(tensor)
     return tensor
 
-
+@tf.function
+def random_rgb_to_bgr(tensor):
+    if  tf.random.uniform([]) < 0.2:
+        tensor = tfio.experimental.color.rgb_to_bgr(tensor)
+    return tensor
 
 def augment_dataset_batch_test(dataset_batch):
     
@@ -100,7 +105,8 @@ Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-    tf.keras.layers.Lambda(random_color_jitter)
+    tf.keras.layers.Lambda(random_color_jitter),
+    tf.keras.layers.Lambda(random_rgb_to_bgr)
 ])
 
 
@@ -261,7 +267,7 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -301,12 +307,12 @@ def our_resnet50(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def our_efficientnet(i_shape, base_lr, n_class, AUGMENTATION):
+def our_efficientnet(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.efficientnet.EfficientNetB7(input_shape = i_shape, include_top = False, weights = 'imagenet')
+    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = True, weights = None, classes=n_class)
     # base_model.summary()
-    base_model.trainable = False
+    base_model.trainable = True
         
     model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     
@@ -316,13 +322,13 @@ def our_efficientnet(i_shape, base_lr, n_class, AUGMENTATION):
     
     model.add(base_model)
     
-    model.add(tf.keras.layers.Flatten())
+    # model.add(tf.keras.layers.Flatten())
     
-    model.add(tf.keras.layers.Dense(512))
+    # model.add(tf.keras.layers.Dense(512))
     # model.add(tf.keras.layers.LeakyReLU())
     # model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    # model.add(tf.keras.layers.Dropout(0.5))
+    # model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -343,7 +349,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
         test_dataset_path,
 #         seed=123,
         image_size=(IMG_H, IMG_W),
-        batch_size=batch_size
+        batch_size=BATCH_SIZE
     )
     
     
@@ -471,7 +477,7 @@ def dataset_manipulation(train_data_path):
 # In[ ]:
 
 
-def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size):
+def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
     
     y = np.concatenate([y for x, y in train_dataset], axis=0)
     print(dict(zip(*np.unique(y, return_counts=True))))
@@ -495,7 +501,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         train_dataset,
         epochs=num_epochs,
         validation_data=val_dataset,
-        # batch_size=batch_size,
+        # batch_size=BATCH_SIZE,
 #         class_weight=train_class_weights,
         callbacks=[saver_callback]   
     )
@@ -515,7 +521,6 @@ if __name__ == "__main__":
     
     # run the function here
     """ Set Hyper parameters """
-    batch_size = 32
     num_epochs = 100
     choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet
     
@@ -551,21 +556,21 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
         # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
     elif choosen_model == 2:
         """
         resnet50
         """
         print("running", name_model)
         our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
     elif choosen_model == 3:
         """
         efficientnet
         """
         print("running", name_model)
         our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_efficientnet, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name, batch_size)
+        __run__(our_efficientnet, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
 
 
 # In[ ]:
