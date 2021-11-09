@@ -84,7 +84,7 @@ def random_hue(tensor):
 def enchantment_image(image):
     # image = tf.image.rgb_to_grayscale(image)
     image = tfa.image.equalize(image)
-    if COLOUR_MODE != "rgb":
+    if COLOUR_MODE != "rgb" and IMG_C != 1:
         image = tf.image.grayscale_to_rgb(image)
     # image = tf_clahe.clahe(image)
     
@@ -683,7 +683,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         train_dataset,
         epochs=num_epochs,
         validation_data=val_dataset,
-        # batch_size=BATCH_SIZE,
+        batch_size=BATCH_SIZE,
 #         class_weight=train_class_weights,
         callbacks=[
             saver_callback, 
