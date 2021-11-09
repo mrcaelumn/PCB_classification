@@ -109,6 +109,9 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
+    noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
+                                        num_parallel_calls=AUTOTUNE)
+    
     if random_aug:
         random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
                                          num_parallel_calls=AUTOTUNE)
@@ -122,20 +125,18 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
         rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
                                             num_parallel_calls=AUTOTUNE)
     
-    noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
-                                        num_parallel_calls=AUTOTUNE)
-
-    
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    
-    dataset_batch = dataset_batch.concatenate(random_flip_up_down)
-    dataset_batch = dataset_batch.concatenate(random_flip_left_right)
-    
-    dataset_batch = dataset_batch.concatenate(rot_90)
-    dataset_batch = dataset_batch.concatenate(rot_180)
-    
     dataset_batch = dataset_batch.concatenate(noise_random)
+    
+    if random_aug:
+        dataset_batch = dataset_batch.concatenate(random_flip_up_down)
+        dataset_batch = dataset_batch.concatenate(random_flip_left_right)
+
+        dataset_batch = dataset_batch.concatenate(rot_90)
+        dataset_batch = dataset_batch.concatenate(rot_180)
+    
+    
 
     
     return dataset_batch
