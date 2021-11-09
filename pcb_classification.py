@@ -17,6 +17,7 @@
 
 import tensorflow as tf
 import tensorflow_io as tfio
+import tensorflow_addons as tfa
 
 import numpy as np
 import os
@@ -32,8 +33,8 @@ from matplotlib import pyplot as plt
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
-IMG_H = 110
-IMG_W = 42
+IMG_H = 224
+IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
@@ -41,8 +42,8 @@ FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 LOW_CLASS = [1 ,2, 3, 4 , 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
-AUGMENTATION = True
-AUGMENTATION_REPEAT = False
+AUGMENTATION = False
+AUGMENTATION_REPEAT = True
 
 
 # In[ ]:
@@ -83,8 +84,11 @@ def enchantment_image(image):
     image = tf.cast(image, tf.float32)
     image = image / 255.0 # range 0 to 1
     # image = tf.image.rgb_to_grayscale(image)
-    image = tf.image.grayscale_to_rgb(image)
-    image = tf_clahe.clahe(image)
+    
+    if COLOUR_MODE != "rgb":
+        image = tf.image.grayscale_to_rgb(image)
+    # image = tf_clahe.clahe(image)
+    image = tfa.image.equalize(image)
     
     return image
 
@@ -95,6 +99,8 @@ def enchantment_dataset(dataset_batch):
 
 def augment_dataset_batch_test(dataset_batch):
     
+    noise = tf.random.normal(shape=(IMG_H, IMG_W, IMG_C), mean=0.0, stddev=1.0,dtype=tf.float32)
+    
     
     flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
                                      num_parallel_calls=AUTOTUNE)
@@ -102,26 +108,34 @@ def augment_dataset_batch_test(dataset_batch):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
-#     rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
-#                                         num_parallel_calls=AUTOTUNE)
     
-#     rgb_to_xyz = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_xyz(image), label),
-#                                         num_parallel_calls=AUTOTUNE)
+    random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
+                                     num_parallel_calls=AUTOTUNE)
+
+    random_flip_left_right = dataset_batch.map(lambda image, label: (tf.image.random_flip_left_right(image), label),
+                                        num_parallel_calls=AUTOTUNE)
     
-    # rgb_to_ycbcr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_ycbcr(image), label),
-    #                                     num_parallel_calls=AUTOTUNE)
-    # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
-    #                                       num_parallel_calls=AUTOTUNE)
+    rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
+                                     num_parallel_calls=AUTOTUNE)
+
+    rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
+                                        num_parallel_calls=AUTOTUNE)
+    
+    noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
+                                        num_parallel_calls=AUTOTUNE)
+
     
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    # dataset_batch = dataset_batch.concatenate(colour_jitter)
-    # dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
-    # dataset_batch = dataset_batch.concatenate(rgb_to_xyz)
-    # dataset_batch = dataset_batch.concatenate(rgb_to_ycbcr)
-    # dataset_batch = dataset_batch.concatenate(random_hue)
-    # dataset_batch = dataset_batch.concatenate(adjust_brightness)
-    # dataset_batch = dataset_batch.concatenate(adjust_saturation)
+    
+    dataset_batch = dataset_batch.concatenate(random_flip_up_down)
+    dataset_batch = dataset_batch.concatenate(random_flip_left_right)
+    
+    dataset_batch = dataset_batch.concatenate(rot_90)
+    dataset_batch = dataset_batch.concatenate(rot_180)
+    
+    dataset_batch = dataset_batch.concatenate(noise_random)
+
     
     return dataset_batch
 
@@ -258,7 +272,7 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'), input_shape=(IMG_H, IMG_W, IMG_C))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
@@ -335,7 +349,7 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
@@ -358,7 +372,7 @@ def build_our_model_v2(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -386,7 +400,7 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.2))
     model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -414,7 +428,7 @@ def our_efficientnet(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -446,7 +460,7 @@ def our_desnet(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
-    model.compile(loss='categorical_crossentropy',
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -570,7 +584,7 @@ def dataset_manipulation(train_data_path, val_data_path):
     train_dataset = enchantment_dataset(train_dataset)
     val_dataset = enchantment_dataset(val_dataset)
     
-    train_dataset = augment_dataset_batch_test(train_dataset)
+    # train_dataset = augment_dataset_batch_test(train_dataset)
     
     print("enchantment_dataset")
     
@@ -637,17 +651,17 @@ def exponential_decay(lr0, s):
 
 def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
     
-    y = np.concatenate([y for x, y in train_dataset], axis=0)
-    print(dict(zip(*np.unique(y, return_counts=True))))
-    class_weights = class_weight.compute_class_weight(
-        class_weight='balanced',
-        classes=np.unique(y), 
-        y=y
-    )
+#     y = np.concatenate([y for x, y in train_dataset], axis=0)
+#     print(dict(zip(*np.unique(y, return_counts=True))))
+#     class_weights = class_weight.compute_class_weight(
+#         class_weight='balanced',
+#         classes=np.unique(y), 
+#         y=y
+#     )
     
-    train_class_weights = dict(enumerate(class_weights))
+#     train_class_weights = dict(enumerate(class_weights))
     
-    print("class_weights: ", train_class_weights)
+#     print("class_weights: ", train_class_weights)
 
     
     saver_callback = CustomSaver(
