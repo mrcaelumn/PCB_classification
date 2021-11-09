@@ -93,14 +93,21 @@ def augment_dataset_batch_test(dataset_batch):
     rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
-    random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
-                                          num_parallel_calls=AUTOTUNE)
+    rgb_to_xyz = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_xyz(image), label),
+                                        num_parallel_calls=AUTOTUNE)
+    
+    rgb_to_ycbcr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_ycbcr(image), label),
+                                        num_parallel_calls=AUTOTUNE)
+    # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
+    #                                       num_parallel_calls=AUTOTUNE)
     
     # dataset_batch = dataset_batch.concatenate(flip_up_down)
     # dataset_batch = dataset_batch.concatenate(flip_left_right)
     # dataset_batch = dataset_batch.concatenate(colour_jitter)
     dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
-    dataset_batch = dataset_batch.concatenate(random_hue)
+    dataset_batch = dataset_batch.concatenate(rgb_to_xyz)
+    dataset_batch = dataset_batch.concatenate(rgb_to_ycbcr)
+    # dataset_batch = dataset_batch.concatenate(random_hue)
     # dataset_batch = dataset_batch.concatenate(adjust_brightness)
     # dataset_batch = dataset_batch.concatenate(adjust_saturation)
     
@@ -536,11 +543,11 @@ def dataset_manipulation(train_data_path, val_data_path):
         val_dataset = augment_dataset_batch_test(val_dataset)
     
     train_dataset = (train_dataset
-                     .shuffle(1000)
+                     # .shuffle(1000)
                      .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
                      # .batch(BATCH_SIZE)
                      .prefetch(AUTOTUNE)
-               )
+                    )
     
     val_dataset = (
         val_dataset
