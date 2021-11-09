@@ -299,7 +299,7 @@ def conv_block(filters):
         tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
         tf.keras.layers.LeakyReLU(),
         tf.keras.layers.SeparableConv2D(filters, 3, padding='same'),
-        tf.keras.layers.LeakyReLU()
+        tf.keras.layers.LeakyReLU(),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.MaxPool2D()
     ])
