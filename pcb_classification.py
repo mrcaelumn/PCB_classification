@@ -34,7 +34,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0,1,3,4]
 LOW_CLASS = [2,5,6,7]
@@ -45,7 +45,7 @@ AUGMENTATION = True
 # In[ ]:
 
 
-def color_jitter(image, brightness=0, contrast=0, saturation=0, hue=0):
+def color_jitter(image, brightness=25, contrast=0.2, saturation=0.2, hue=0.1):
     """Distort the color of the image."""
     if brightness > 0:
         image = tf.image.random_brightness(image, max_delta=brightness)
@@ -68,6 +68,11 @@ def random_rgb_to_bgr(tensor):
     if  tf.random.uniform([]) < 0.2:
         tensor = tfio.experimental.color.rgb_to_bgr(tensor)
     return tensor
+
+def rescale_dataset(image, label):
+    image = tf.cast(image, tf.float32)
+    image = (image / 255.0)
+    return image, label
 
 def augment_dataset_batch_test(dataset_batch):
     
@@ -225,7 +230,6 @@ def build_our_model(i_shape, base_lr, n_class):
     
     model = tf.keras.models.Sequential()
     
-    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     if AUGMENTATION:
         model.add(data_augmentation)
         
@@ -277,24 +281,81 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
+def conv_block(filters):
+    block = tf.keras.Sequential([
+        tf.keras.layers.SeparableConv2D(filters, 3, activation='relu', padding='same'),
+        tf.keras.layers.SeparableConv2D(filters, 3, activation='relu', padding='same'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPool2D()
+    ])
+    
+    return block
+
+def dense_block(units, dropout_rate):
+    block = tf.keras.Sequential([
+        tf.keras.layers.Dense(units, activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dropout(dropout_rate)
+    ])
+    
+    return block
+
+def build_our_model_v2(i_shape, base_lr, n_class):
+    
+    model = tf.keras.models.Sequential()
+    
+    if AUGMENTATION:
+        model.add(data_augmentation)
+        
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    
+    model.add(conv_block(64))
+    model.add(conv_block(128))
+    
+    model.add(conv_block(256))
+    model.add(tf.keras.layers.Dropout(0.2))
+    
+    model.add(conv_block(512))
+    model.add(tf.keras.layers.Dropout(0.2))
+    
+    model.add(tf.keras.layers.Flatten())
+    
+    model.add(dense_block(1024, 0.7))
+    model.add(dense_block(512, 0.5))
+    model.add(dense_block(256, 0.3))
+    
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+                  metrics=['accuracy'])
+    
+    return model
+
+
+# In[ ]:
+
+
 def our_resnet50(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.resnet_v2.ResNet50V2(input_shape=i_shape, include_top=False, pooling='avg', weights="imagenet")
-    # base_model.summary()
-    base_model.trainable = False
+    base_model = tf.keras.applications.ResNet50V2(weights='imagenet', input_shape=i_shape, include_top=False)
+
+    for layer in base_model.layers:
+        layer.trainable = False
         
-    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     if AUGMENTATION:
         model.add(data_augmentation)    
     
     model.add(base_model)
     
-    model.add(tf.keras.layers.Dense(512))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.GlobalAveragePooling2D())
-    # model.add(tf.keras.layers.BatchNormalization())
-    # model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(128, activation = 'relu'))
+    model.add(tf.keras.layers.Dropout(0.2))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
@@ -310,11 +371,10 @@ def our_resnet50(i_shape, base_lr, n_class):
 def our_efficientnet(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = True, weights = None, classes=n_class)
+    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = "imagenet", classes=n_class)
     # base_model.summary()
-    base_model.trainable = True
+    # base_model.trainable = True
         
-    model.add(tf.keras.layers.Rescaling(scale=1./255, input_shape=i_shape))
     
     if AUGMENTATION:
         model.add(data_augmentation)
@@ -322,13 +382,41 @@ def our_efficientnet(i_shape, base_lr, n_class):
     
     model.add(base_model)
     
-    # model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+                  metrics=['accuracy'])
+    
+    return model
+
+
+# In[ ]:
+
+
+def our_desnet(i_shape, base_lr, n_class):
+    model = tf.keras.models.Sequential()
+    
+    base_model = tf.keras.applications.DenseNet121(input_shape = i_shape, include_top = False, weights = "imagenet")
+    # base_model.summary()
+    # base_model.trainable = True
+        
+    
+    if AUGMENTATION:
+        model.add(data_augmentation)
+        
+    
+    model.add(base_model)
+    
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
     
     # model.add(tf.keras.layers.Dense(512))
     # model.add(tf.keras.layers.LeakyReLU())
     # model.add(tf.keras.layers.BatchNormalization())
-    # model.add(tf.keras.layers.Dropout(0.5))
-    # model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dropout(0.5))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -417,20 +505,20 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 
 # @tf.function
-def dataset_manipulation(train_data_path):
+def dataset_manipulation(train_data_path, val_data_path):
     train_dataset = tf.keras.utils.image_dataset_from_directory(
         train_data_path,
-        validation_split=0.15,
-        subset="training",
-        seed=123,
+        # validation_split=0.15,
+        # subset="training",
+        # seed=123,
         image_size=(IMG_H, IMG_W))
 
     
     val_dataset = tf.keras.utils.image_dataset_from_directory(
-        train_data_path,
-        validation_split=0.15,
-        subset="validation",
-        seed=123,
+        val_data_path,
+        # validation_split=0.15,
+        # subset="validation",
+        # seed=123,
         image_size=(IMG_H, IMG_W))
     
     
@@ -441,6 +529,19 @@ def dataset_manipulation(train_data_path):
     # train_dataset = augment_dataset_batch_test(train_dataset)
     # val_dataset = augment_dataset_batch_test(val_dataset)
     
+    train_dataset = (train_dataset
+                     .shuffle(1000)
+                     .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
+                     # .batch(BATCH_SIZE)
+                     .prefetch(AUTOTUNE)
+               )
+    
+    val_dataset = (
+        val_dataset
+        .map(rescale_dataset, num_parallel_calls=AUTOTUNE)
+        # .batch(BATCH_SIZE)
+        .prefetch(AUTOTUNE)
+    )
     
     return train_dataset, val_dataset
 
@@ -477,6 +578,12 @@ def dataset_manipulation(train_data_path):
 # In[ ]:
 
 
+def exponential_decay(lr0, s):
+    def exponential_decay_fn(epoch):
+        return lr0 * 0.1 **(epoch / s)
+    return exponential_decay_fn
+
+
 def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
     
     y = np.concatenate([y for x, y in train_dataset], axis=0)
@@ -497,13 +604,18 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         name_model
     )
     
+    
+    exponential_decay_fn = exponential_decay(0.01, 20)
+    lr_scheduler = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
+    
+    
     fit_history_our_model = our_model.fit(
         train_dataset,
         epochs=num_epochs,
         validation_data=val_dataset,
         # batch_size=BATCH_SIZE,
 #         class_weight=train_class_weights,
-        callbacks=[saver_callback]   
+        callbacks=[saver_callback, lr_scheduler]   
     )
     
     evaluate_and_testing(our_model, path_model, test_data_path, class_name)
@@ -522,7 +634,7 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     num_epochs = 100
-    choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet
+    choosen_model = 5 # 1 == our model, 2 == resnet50, 3 == efficientnet, 4 == desnet, 5 == custom_model_v2
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     
@@ -532,6 +644,10 @@ if __name__ == "__main__":
         name_model = name_model + "-resnet50"
     elif choosen_model == 3:
         name_model = name_model + "-efficientnet"
+    elif choosen_model == 4:
+        name_model = name_model + "-desnet"
+    elif choosen_model == 5:
+        name_model = name_model + "-custom_model_v2"
         
     print("start: ", name_model)
     base_learning_rate = 0.0001
@@ -547,7 +663,7 @@ if __name__ == "__main__":
     
     path_model = saved_model_path + name_model + "_model" + ".h5"
     
-    train_dataset, val_dataset = dataset_manipulation(train_data_path)
+    train_dataset, val_dataset = dataset_manipulation(train_data_path, test_data_path)
     
     if choosen_model == 1:
         """
@@ -562,15 +678,29 @@ if __name__ == "__main__":
         resnet50
         """
         print("running", name_model)
-        our_resnet50 = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_resnet50, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+        our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
     elif choosen_model == 3:
         """
         efficientnet
         """
         print("running", name_model)
-        our_efficientnet = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_efficientnet, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+        our_model = our_efficientnet(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+    elif choosen_model == 4:
+        """
+        desnet
+        """
+        print("running", name_model)
+        our_model = our_desnet(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
+    elif choosen_model == 5:
+        """
+        desnet
+        """
+        print("running", name_model)
+        our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
 
 
 # In[ ]:
