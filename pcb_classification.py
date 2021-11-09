@@ -40,6 +40,7 @@ HIGH_CLASS = [0,1,3,4]
 LOW_CLASS = [2,5,6,7]
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = True
+AUGMENTATION_REPEAT = True
 
 
 # In[ ]:
@@ -69,6 +70,13 @@ def random_rgb_to_bgr(tensor):
         tensor = tfio.experimental.color.rgb_to_bgr(tensor)
     return tensor
 
+
+@tf.function
+def random_hue(tensor):
+    if  tf.random.uniform([]) < 0.2:
+        tensor = tf.image.random_hue(tensor, 0.2)
+    return tensor
+
 def rescale_dataset(image, label):
     image = tf.cast(image, tf.float32)
     image = (image / 255.0)
@@ -82,20 +90,17 @@ def augment_dataset_batch_test(dataset_batch):
 #     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
 #                                         num_parallel_calls=AUTOTUNE)
     
-#     adjust_brightness = dataset_batch.map(lambda image, label: (tf.image.adjust_brightness(image, 0.1), label),
-#               num_parallel_calls=AUTOTUNE)
-    
-#     adjust_saturation = dataset_batch.map(lambda image, label: (tf.image.adjust_saturation(image, 2), label),
-#               num_parallel_calls=AUTOTUNE)
-    colour_jitter = dataset_batch.map(lambda image, label: (color_jitter(image), label),
+    rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
                                         num_parallel_calls=AUTOTUNE)
-    # rgb_to_bgr = dataset_batch.map(lambda image, label: (tfio.experimental.color.rgb_to_bgr(image), label),
-    #                                       num_parallel_calls=AUTOTUNE)
+    
+    random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, 0.2), label),
+                                          num_parallel_calls=AUTOTUNE)
     
     # dataset_batch = dataset_batch.concatenate(flip_up_down)
     # dataset_batch = dataset_batch.concatenate(flip_left_right)
-    dataset_batch = dataset_batch.concatenate(colour_jitter)
-    # dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
+    # dataset_batch = dataset_batch.concatenate(colour_jitter)
+    dataset_batch = dataset_batch.concatenate(rgb_to_bgr)
+    dataset_batch = dataset_batch.concatenate(random_hue)
     # dataset_batch = dataset_batch.concatenate(adjust_brightness)
     # dataset_batch = dataset_batch.concatenate(adjust_saturation)
     
@@ -110,8 +115,9 @@ Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-    tf.keras.layers.Lambda(random_color_jitter),
-    tf.keras.layers.Lambda(random_rgb_to_bgr)
+    #tf.keras.layers.Lambda(random_color_jitter),
+    #tf.keras.layers.Lambda(random_rgb_to_bgr),
+    # tf.keras.layers.Lambda(random_hue),
 ])
 
 
@@ -525,9 +531,9 @@ def dataset_manipulation(train_data_path, val_data_path):
     class_names = train_dataset.class_names
     print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
-    
-    # train_dataset = augment_dataset_batch_test(train_dataset)
-    # val_dataset = augment_dataset_batch_test(val_dataset)
+    if AUGMENTATION_REPEAT:
+        train_dataset = augment_dataset_batch_test(train_dataset)
+        val_dataset = augment_dataset_batch_test(val_dataset)
     
     train_dataset = (train_dataset
                      .shuffle(1000)
