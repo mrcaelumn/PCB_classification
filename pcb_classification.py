@@ -454,26 +454,21 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Flatten())
     
     model.add(tf.keras.layers.Dense(128
-                                    # ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,activation = 'relu'
+                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
-    model.add(tf.keras.layers.LeakyReLU())
     
     model.add(tf.keras.layers.Dense(128
-                                    # ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,activation = 'relu'
+                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
-    model.add(tf.keras.layers.LeakyReLU())
     
     model.add(tf.keras.layers.Dense(128
-                                    # ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,activation = 'relu'
                                    ))
-    model.add(tf.keras.layers.LeakyReLU())
     
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="tanh"
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,activation="softmax"
                                    ))
     
     model.compile(loss='sparse_categorical_crossentropy',
@@ -576,43 +571,44 @@ def dataset_manipulation(train_data_path, val_data_path):
     
     
     
-    if AUGMENTATION_REPEAT:
-        train_dataset = augment_dataset_batch_test(train_dataset)
+    # if AUGMENTATION_REPEAT:
+    #     train_dataset = augment_dataset_batch_test(train_dataset)
     #     val_dataset = augment_dataset_batch_test(val_dataset)
     
     
     
     # return train_dataset, val_dataset
-#     if AUGMENTATION_REPEAT:
-#         print("AUGMENTATION_REPEAT")
-#         train_dataset = train_dataset.unbatch()
+    if AUGMENTATION_REPEAT:
+        print("AUGMENTATION_REPEAT")
+        train_dataset = train_dataset.unbatch()
 
-#     #     print(len(list(train_dataset)))
-#         train_dataset_dict = {}
-#         top_number_of_dataset = 0
-#         # print("before preprocessing")
-#         for a in range(0, 8):
-#             filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-#             len_current_dataset = len(list(filtered_dataset))
-#             print("class: ", a, len_current_dataset)
-#             if a in LOW_CLASS:
-#                 filtered_dataset = augment_dataset_batch_test(filtered_dataset)
-#             elif a in MID_CLASS:
-#                 filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
+    #     print(len(list(train_dataset)))
+        train_dataset_dict = {}
+        top_number_of_dataset = 0
+        # print("before preprocessing")
+        for a in range(0, 8):
+            filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
+            len_current_dataset = len(list(filtered_dataset))
+            print("class: ", a, len_current_dataset)
+            if a in LOW_CLASS:
+                filtered_dataset = augment_dataset_batch_test(filtered_dataset)
+            elif a in MID_CLASS:
+                filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
 
-#             train_dataset_dict[a] = filtered_dataset
+            train_dataset_dict[a] = filtered_dataset
 
 
-#         print("===========================================")
-#         final_dataset = train_dataset_dict[0]
-#         len_current_dataset = len(list(final_dataset))
-#         print("class: ", 0, len_current_dataset)
-#         for a in range (1, 8):
-#             len_current_dataset = len(list(train_dataset_dict[a]))
-#             print("class: ", a, len_current_dataset)
-#             final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+        print("===========================================")
+        
+        final_dataset = train_dataset_dict[0]
+        len_current_dataset = len(list(final_dataset))
+        print("class: ", 0, len_current_dataset)
+        for a in range (1, 8):
+            len_current_dataset = len(list(train_dataset_dict[a]))
+            print("class: ", a, len_current_dataset)
+            final_dataset = final_dataset.concatenate(train_dataset_dict[a])
 
-#         train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
+        train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
     return train_dataset, val_dataset
 
@@ -717,7 +713,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_resmpling_low_class/training_dataset"
+    train_data_path = "image_dataset_resmpling_low_c/training_dataset"
     test_data_path = "image_dataset_resmpling_low_class/evaluation_dataset"
     saved_model_path = "saved_model/"
     
