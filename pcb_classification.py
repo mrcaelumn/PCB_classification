@@ -46,8 +46,8 @@ HIGH_CLASS = [0]
 MID_CLASS = [1, 4]
 LOW_CLASS = [2, 3, 5, 6, 7]
 AUTOTUNE = tf.data.AUTOTUNE
-AUGMENTATION = True
-AUGMENTATION_REPEAT = False
+AUGMENTATION = False
+AUGMENTATION_REPEAT = True
 
 
 # In[ ]:
@@ -86,11 +86,12 @@ def random_hue(tensor):
 
 def enchantment_image(image):
     # image = tf.image.rgb_to_grayscale(image)
-    # image = tfa.image.equalize(image)
+    # 
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
-        
-    image = tf_clahe.clahe(image)
+    if COLOUR_MODE == "grayscale":
+        image = tfa.image.equalize(image)
+        # image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
     image = image / 255.0 # range 0 to 1
@@ -337,10 +338,8 @@ def build_our_model(i_shape, base_lr, n_class):
 def our_resnet50(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=False)
-
-    # for layer in base_model.layers:
-    #     layer.trainable = False
+    base_model = tf.keras.applications.ResNet50(weights="imagenet", input_shape=i_shape, include_top=False)
+    base_model.trainable = False
         
     if AUGMENTATION:
         model.add(data_augmentation)    
@@ -611,7 +610,7 @@ if __name__ == "__main__":
         name_model = name_model + "-resnet50"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0002
+    base_learning_rate = 0.0001
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
