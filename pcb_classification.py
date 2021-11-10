@@ -33,9 +33,9 @@ from matplotlib import pyplot as plt
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
-IMG_H = 150
-IMG_W = 100
-IMG_C = 3  ## Change this to 1 for grayscale.
+IMG_H = 110
+IMG_W = 42
+IMG_C = 1  ## Change this to 1 for grayscale.
 COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
@@ -84,9 +84,9 @@ def random_hue(tensor):
 def enchantment_image(image):
     # image = tf.image.rgb_to_grayscale(image)
     image = tfa.image.equalize(image)
-    if COLOUR_MODE != "rgb" and IMG_C != 1:
+    if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
-    # image = tf_clahe.clahe(image)
+    image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
     image = image / 255.0 # range 0 to 1
@@ -102,7 +102,7 @@ def enchantment_dataset(dataset_batch):
 # In[ ]:
 
 
-def augment_dataset_batch_test(dataset_batch, random_aug=True):
+def augment_dataset_batch_test(dataset_batch, random_aug=False):
     
     noise = tf.random.normal(shape=(IMG_H, IMG_W, IMG_C), mean=0.0, stddev=1.0,dtype=tf.float32)
     
@@ -113,8 +113,7 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
     flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
                                         num_parallel_calls=AUTOTUNE)
     
-    noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
-                                        num_parallel_calls=AUTOTUNE)
+    
     
     if random_aug:
         
@@ -129,10 +128,13 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
 
         rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
                                             num_parallel_calls=AUTOTUNE)
+        
+        noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
+                                        num_parallel_calls=AUTOTUNE)
     
     dataset_batch = dataset_batch.concatenate(flip_up_down)
     dataset_batch = dataset_batch.concatenate(flip_left_right)
-    dataset_batch = dataset_batch.concatenate(noise_random)
+    
     
     if random_aug:
         dataset_batch = dataset_batch.concatenate(random_flip_up_down)
@@ -140,6 +142,8 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
 
         dataset_batch = dataset_batch.concatenate(rot_90)
         dataset_batch = dataset_batch.concatenate(rot_180)
+        
+        dataset_batch = dataset_batch.concatenate(noise_random)
 
     return dataset_batch
 
@@ -275,46 +279,45 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(16, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
+    model.add(tf.keras.layers.Conv2D(16, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.2))
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.3))
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=0.001, l2=0.01), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.4))
     
     model.add(tf.keras.layers.Flatten())
 
-    model.add(tf.keras.layers.Dense(256))
+    model.add(tf.keras.layers.Dense(512,
+                                    kernel_regularizer=tf.keras.regularizers.l1(0.01),
+                                    activity_regularizer=tf.keras.regularizers.l2(0.01)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class,
-                                    kernel_regularizer=tf.keras.regularizers.l1(0.01),
-                                    activity_regularizer=tf.keras.regularizers.l2(0.01),
-                                    activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -463,10 +466,10 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 #         seed=123,
         image_size=(IMG_H, IMG_W),
         color_mode=COLOUR_MODE,
-        batch_size=BATCH_SIZE
+        # batch_size=BATCH_SIZE
     )
     
-    evaluation_ds = enchantment_image(evaluation_ds)
+    evaluation_ds = enchantment_dataset(evaluation_ds)
     # Evaluate the model on the test data using `evaluate`
     # You can also evaluate or predict on a dataset.
     print("Evaluate")
@@ -499,6 +502,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                 img = tf.keras.utils.load_img(
                     filepath, target_size=(IMG_H, IMG_W)
                 )
+                
                 img_array = tf.keras.utils.img_to_array(img)
                 
                 img_array = tf.expand_dims(img_array, 0) # Create a batch
@@ -586,8 +590,8 @@ def dataset_manipulation(train_data_path, val_data_path):
     
     
     
-    # if AUGMENTATION_REPEAT:
-    #     train_dataset = augment_dataset_batch_test(train_dataset)
+    if AUGMENTATION_REPEAT:
+        train_dataset = augment_dataset_batch_test(train_dataset)
     #     val_dataset = augment_dataset_batch_test(val_dataset)
     
     
@@ -688,7 +692,7 @@ if __name__ == "__main__":
     
     # run the function here
     """ Set Hyper parameters """
-    num_epochs = 100
+    num_epochs = 1
     choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet, 4 == desnet, 5 == custom_model_v2
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
@@ -710,7 +714,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_resmpling_low_class/training_dataset"
+    train_data_path = "image_dataset_resmpling_low_class/test_training_dataset"
     test_data_path = "image_dataset_resmpling_low_class/evaluation_dataset"
     saved_model_path = "saved_model/"
     
