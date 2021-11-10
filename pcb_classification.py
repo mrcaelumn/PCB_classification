@@ -36,8 +36,8 @@ from matplotlib import pyplot as plt
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
-IMG_H = 110
-IMG_W = 42
+IMG_H = 224
+IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
@@ -118,7 +118,8 @@ def prep_image(image):
         
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
-    
+        
+    image = tf.image.resize(image, (IMG_H, IMG_W))
     image = tf.cast(image, tf.float32)
     # image = (image - 255.0)  # rescailing image from 0,255 to 0, 1
     # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
@@ -597,7 +598,7 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     num_epochs = 2
-    choosen_model = 1 # 1 == our model, 2 == resnet50
+    choosen_model = 2 # 1 == our model, 2 == resnet50
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     
@@ -637,4 +638,10 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
         __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+
+
+# In[ ]:
+
+
+
 
