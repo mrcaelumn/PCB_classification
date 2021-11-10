@@ -391,21 +391,25 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Flatten())
     
     model.add(tf.keras.layers.Dense(128
-                                    ,activation = 'relu'
+                                    # ,activation = 'relu'
                                     ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
-    model.add(tf.keras.layers.Dense(128
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
-                                   ))
-    model.add(tf.keras.layers.Dense(128
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
-                                   ))
+    model.add(tf.keras.layers.LeakyReLU())
     
+    model.add(tf.keras.layers.Dense(128
+                                    # ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
+    model.add(tf.keras.layers.LeakyReLU())
+    
+    model.add(tf.keras.layers.Dense(128
+                                    # ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
+    model.add(tf.keras.layers.LeakyReLU())
     
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="softmax"
+                                    ,activation="tanh"
                                     ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
     
