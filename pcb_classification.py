@@ -275,31 +275,31 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.2))
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.3))
 
-    model.add(tf.keras.layers.Conv2D(256, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(256, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(256, (3, 3), padding='same'))
+    model.add(tf.keras.layers.Conv2D(256, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
@@ -311,7 +311,10 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class,
+                                    kernel_regularizer=tf.keras.regularizers.l1(0.01),
+                                    activity_regularizer=tf.keras.regularizers.l2(0.01),
+                                    activation="tanh"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -707,8 +710,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_over/training_dataset"
-    test_data_path = "image_dataset_over/evaluation_dataset"
+    train_data_path = "image_dataset_resmpling_low_class/training_dataset"
+    test_data_path = "image_dataset_resmpling_low_class/evaluation_dataset"
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
