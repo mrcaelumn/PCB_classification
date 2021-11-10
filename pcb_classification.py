@@ -10,6 +10,9 @@
 # !pip install -U scikit-learn
 # !pip install matplotlib
 # !pip install pandas
+# !pip install tensorflow_io
+# !pip install tensorflow_addons
+# !pip install tf_clahe
 
 
 # In[ ]:
@@ -90,8 +93,8 @@ def enchantment_image(image):
     image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
-    # image = image / 255.0 # range 0 to 1
-    image = (image - 127.5) / 127.5 # range -1 to 1
+    image = image / 255.0 # range 0 to 1
+    # image = (image - 127.5) / 127.5 # range -1 to 1
     
     return image
 
@@ -361,30 +364,6 @@ def our_resnet50(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def our_efficientnet(i_shape, base_lr, n_class):
-    model = tf.keras.models.Sequential()
-    
-    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = True, weights = None, classes=n_class)
-    # base_model.summary()
-    # base_model.trainable = True
-        
-    
-    if AUGMENTATION:
-        model.add(data_augmentation)
-        
-    
-    model.add(base_model)
-    
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
-                  metrics=['accuracy'])
-    
-    return model
-
-
-# In[ ]:
-
-
 def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     """
     Evaluation Area
@@ -622,7 +601,7 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     num_epochs = 100
-    choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet, 5 == custom_model_v2
+    choosen_model = 1 # 1 == our model, 2 == resnet50
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     
@@ -630,8 +609,6 @@ if __name__ == "__main__":
         name_model = name_model + "-custom_model"
     elif choosen_model == 2:
         name_model = name_model + "-resnet50"
-    elif choosen_model == 3:
-        name_model = name_model + "-efficientnet"
         
     print("start: ", name_model)
     base_learning_rate = 0.0002
@@ -664,11 +641,4 @@ if __name__ == "__main__":
         print("running", name_model)
         our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
         __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 3:
-        """
-        efficientnet
-        """
-        print("running", name_model)
-        our_model = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
 
