@@ -121,7 +121,7 @@ def prep_image(image):
         
     image = tf.image.resize(image, (IMG_H, IMG_W))
     image = tf.cast(image, tf.float32)
-    # image = (image - 255.0)  # rescailing image from 0,255 to 0, 1
+    image = (image - 255.0)  # rescailing image from 0,255 to 0, 1
     # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
     
     return image
@@ -390,10 +390,24 @@ def our_resnet50(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Flatten())
     
-    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
-    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
-    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
+    model.add(tf.keras.layers.Dense(128
+                                    ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
+    model.add(tf.keras.layers.Dense(128
+                                    ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
+    model.add(tf.keras.layers.Dense(128
+                                    ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
+    
+    
+    model.add(tf.keras.layers.Dense(n_class
+                                    ,activation="softmax"
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                   ))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
