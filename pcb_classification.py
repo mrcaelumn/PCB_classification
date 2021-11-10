@@ -83,9 +83,10 @@ def random_hue(tensor):
 
 def enchantment_image(image):
     # image = tf.image.rgb_to_grayscale(image)
-    image = tfa.image.equalize(image)
+    # image = tfa.image.equalize(image)
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
+        
     image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
