@@ -659,8 +659,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_ori/training_dataset"
-    test_data_path = "image_dataset_ori/evaluation_dataset"
+    train_data_path = "image_dataset_final/training_dataset"
+    test_data_path = "image_dataset_final/evaluation_dataset"
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
