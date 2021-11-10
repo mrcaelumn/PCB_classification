@@ -275,7 +275,17 @@ def build_our_model(i_shape, base_lr, n_class):
     if AUGMENTATION:
         model.add(data_augmentation)
         
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
+    model.add(tf.keras.layers.Conv2D(16, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.BatchNormalization())
+
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+    model.add(tf.keras.layers.Dropout(0.2))
+
+    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
@@ -283,23 +293,13 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-    model.add(tf.keras.layers.Dropout(0.2))
-
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.BatchNormalization())
-
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
     model.add(tf.keras.layers.Dropout(0.3))
 
-    model.add(tf.keras.layers.Conv2D(256, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
 
-    model.add(tf.keras.layers.Conv2D(256, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
+    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_regularizer=tf.keras.regularizers.l1_l2(l1=1e-5, l2=1e-4), padding='same'))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.MaxPooling2D((2, 2)))
@@ -307,7 +307,7 @@ def build_our_model(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Flatten())
 
-    model.add(tf.keras.layers.Dense(1024))
+    model.add(tf.keras.layers.Dense(256))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
