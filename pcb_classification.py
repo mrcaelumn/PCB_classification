@@ -26,7 +26,7 @@ import numpy as np
 import os
 import csv
 import tf_clahe
-
+import cv2
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.utils import class_weight
@@ -38,13 +38,14 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 IMG_H = 110
 IMG_W = 42
-IMG_C = 1  ## Change this to 1 for grayscale.
+IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "grayscale"
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 MID_CLASS = [1, 4]
 LOW_CLASS = [2, 3, 5, 6, 7]
+CLASS_NAME = ["0","1","2", "3","4", "5", "6", "7"]
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
 AUGMENTATION_REPEAT = True
@@ -84,25 +85,65 @@ def random_hue(tensor):
         tensor = tf.image.random_hue(tensor, 0.2)
     return tensor
 
-def enchantment_image(image):
-    # image = tf.image.rgb_to_grayscale(image)
-    # 
+
+# In[ ]:
+
+
+def read_data_with_labels(filepath, class_names):
+    image_list = []
+    label_list = []
+    for class_n in class_names:  # do dogs and cats
+        path = os.path.join(filepath,class_n)  # create path to dogs and cats
+        class_num = class_names.index(class_n)  # get the classification  (0 or a 1). 0=dog 1=cat
+
+        for img in tqdm(os.listdir(path)):  
+            if img.endswith(tuple(FORMAT_IMAGE)):
+                filpath = os.path.join(path,img)
+#                 print(filpath, class_num)
+                image_list.append(filpath)
+                label_list.append(class_num)
+#     print(image_list, label_list)
+    return image_list, label_list
+
+def prep_image(image):
+    """
+    Preparation
+    """
+    if COLOUR_MODE == "grayscale":
+        image = tf.image.rgb_to_grayscale(image)
+        image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0)
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        # image = clahe.apply(image)
+        
+        
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
-    if COLOUR_MODE == "grayscale":
-        image = tfa.image.equalize(image)
-        # image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
-    image = image / 255.0 # range 0 to 1
-    # image = (image - 127.5) / 127.5 # range -1 to 1
+    # image = (image - 255.0)  # rescailing image from 0,255 to 0, 1
+    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
     
     return image
 
-def enchantment_dataset(dataset_batch):
-    final_dataset = dataset_batch.map(lambda image, label: (enchantment_image(image), label),
-                                     num_parallel_calls=AUTOTUNE)
-    return final_dataset
+def load_image_with_label(image_path, label):
+    img = tf.io.read_file(image_path)
+    img = tf.io.decode_png(img, channels=IMG_C)
+    img = prep_image(img)
+    
+    return img, label
+
+def tf_dataset_labels(images_path, batch_size):
+    
+    filenames, labels = read_data_with_labels(images_path, CLASS_NAME)
+#     print("testing")
+#     print(filenames, labels)
+    dataset = tf.data.Dataset.from_tensor_slices((filenames, labels))
+    dataset = dataset.shuffle(buffer_size=10240)
+    dataset = dataset.map(load_image_with_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    return dataset
 
 
 # In[ ]:
@@ -368,17 +409,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     Evaluation Area
     """
     this_model.load_weights(p_model)
-    evaluation_ds = tf.keras.utils.image_dataset_from_directory(
-        test_dataset_path,
-#         seed=123,
-        image_size=(IMG_H, IMG_W),
-        color_mode=COLOUR_MODE,
-        # batch_size=BATCH_SIZE
-    )
-    
-    evaluation_ds = enchantment_dataset(evaluation_ds)
-    # Evaluate the model on the test data using `evaluate`
-    # You can also evaluate or predict on a dataset.
+    evaluation_ds = tf_dataset_labels(test_dataset_path, BATCH_SIZE)
     print("Evaluate")
     result = this_model.evaluate(evaluation_ds)
     print(result)
@@ -393,7 +424,6 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     label_list = []
     
     probability_model = tf.keras.Sequential([
-        # tf.keras.layers.Rescaling(scale=1./255, input_shape=(IMG_H, IMG_W, IMG_C)), 
         this_model,
     ])
     for class_n in c_names:
@@ -409,7 +439,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                 img = tf.keras.utils.load_img(
                     filepath, target_size=(IMG_H, IMG_W)
                 )
-                
+                img = prep_image(img)
                 img_array = tf.keras.utils.img_to_array(img)
                 
                 img_array = tf.expand_dims(img_array, 0) # Create a batch
@@ -423,9 +453,9 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                 name_image_list.append(name_image)
                 label_list.append(class_num)
 
-    final_result = zip(name_image_list, label_list, pred_list)
-    for n, l, p in final_result:
-         print("name image: ", n, "label image: ", l, "prediction class: ", p)
+    # final_result = zip(name_image_list, label_list, pred_list)
+    # for n, l, p in final_result:
+    #      print("name image: ", n, "label image: ", l, "prediction class: ", p)
             
 #     print("final result: ", final_result)
     confusion_matrix_report(label_list, pred_list, c_names)
@@ -443,56 +473,23 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 # @tf.function
 def dataset_manipulation(train_data_path, val_data_path):
+        
+    train_dataset = tf_dataset_labels(train_data_path, BATCH_SIZE)
+    val_dataset = tf_dataset_labels(val_data_path, BATCH_SIZE)
     
-    train_dataset = tf.keras.utils.image_dataset_from_directory(
-        train_data_path,
-        # validation_split=0.15,
-        # subset="training",
-        batch_size=BATCH_SIZE,
-        # seed=123,
-        color_mode=COLOUR_MODE,
-        image_size=(IMG_H, IMG_W))
-
-    
-    val_dataset = tf.keras.utils.image_dataset_from_directory(
-        val_data_path,
-        # validation_split=0.15,
-        # subset="validation",
-        # seed=123,
-        batch_size=BATCH_SIZE,
-        color_mode=COLOUR_MODE,
-        image_size=(IMG_H, IMG_W))
-    
-    class_names = train_dataset.class_names
-    print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
+    # class_names = train_dataset.class_names
+    # print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
     
     # print("Before: ")
     # plt.figure(figsize=(10, 10))
     # for images, labels in train_dataset.take(1):
     #     for i in range(9):
     #         ax = plt.subplot(3, 3,i+1)
-    #         plt.imshow(images[i])
-    #         plt.title(class_names[labels[i]])
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.title(CLASS_NAME[labels[i]])
     #         plt.axis("off")
     # print(train_dataset)
     
-    
-    train_dataset = enchantment_dataset(train_dataset)
-    val_dataset = enchantment_dataset(val_dataset)
-    
-    # train_dataset = augment_dataset_batch_test(train_dataset)
-    
-    print("enchantment_dataset")
-    
-    # print(train_dataset)
-    # print("after: ")
-    # plt.figure(figsize=(10, 10))
-    # for images, labels in train_dataset.take(1):
-    #     for i in range(9):
-    #         ax = plt.subplot(3, 3, i+1)
-    #         plt.imshow(images[i])
-    #         plt.title(class_names[labels[i]])
-    #         plt.axis("off")
     
     
     
@@ -577,7 +574,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         epochs=num_epochs,
         validation_data=val_dataset,
         batch_size=BATCH_SIZE,
-#         class_weight=train_class_weights,
+        # class_weight=train_class_weights,
         callbacks=[
             saver_callback, 
             # lr_scheduler
@@ -599,7 +596,7 @@ if __name__ == "__main__":
     
     # run the function here
     """ Set Hyper parameters """
-    num_epochs = 100
+    num_epochs = 2
     choosen_model = 1 # 1 == our model, 2 == resnet50
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
