@@ -23,6 +23,7 @@ import tensorflow_io as tfio
 import tensorflow_addons as tfa
 
 import numpy as np
+import pandas as pd
 import os
 import csv
 import tf_clahe
@@ -36,168 +37,23 @@ from matplotlib import pyplot as plt
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
+""" Set Hyper parameters """
+NUM_EPOCHS = 2
+CHOOSEN_MODEL = 2 # 1 == our model, 2 == mobilenet, 3 == resnet50
 IMG_H = 224
 IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
-COLOUR_MODE = "grayscale"
+COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 MID_CLASS = [1, 4]
 LOW_CLASS = [2, 3, 5, 6, 7]
 CLASS_NAME = ["0","1","2", "3","4", "5", "6", "7"]
+
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
 AUGMENTATION_REPEAT = True
-
-
-# In[ ]:
-
-
-def color_jitter(image, brightness=25, contrast=0.2, saturation=0.2, hue=0.1):
-    """Distort the color of the image."""
-    if brightness > 0:
-        image = tf.image.random_brightness(image, max_delta=brightness)
-    if contrast > 0:
-        image = tf.image.random_contrast(image, lower=1-contrast, upper=1+contrast)
-    if saturation > 0:
-        image = tf.image.random_saturation(image, lower=1-saturation, upper=1+saturation)
-    if hue > 0:
-        image = tf.image.random_hue(image, max_delta=hue)
-    return image 
-
-@tf.function
-def random_color_jitter(tensor):
-    if  tf.random.uniform([]) < 0.2:
-        tensor = color_jitter(tensor)
-    return tensor
-
-@tf.function
-def random_rgb_to_bgr(tensor):
-    if  tf.random.uniform([]) < 0.2:
-        tensor = tfio.experimental.color.rgb_to_bgr(tensor)
-    return tensor
-
-
-@tf.function
-def random_hue(tensor):
-    if  tf.random.uniform([]) < 0.2:
-        tensor = tf.image.random_hue(tensor, 0.2)
-    return tensor
-
-
-# In[ ]:
-
-
-def read_data_with_labels(filepath, class_names):
-    image_list = []
-    label_list = []
-    for class_n in class_names:  # do dogs and cats
-        path = os.path.join(filepath,class_n)  # create path to dogs and cats
-        class_num = class_names.index(class_n)  # get the classification  (0 or a 1). 0=dog 1=cat
-
-        for img in tqdm(os.listdir(path)):  
-            if img.endswith(tuple(FORMAT_IMAGE)):
-                filpath = os.path.join(path,img)
-#                 print(filpath, class_num)
-                image_list.append(filpath)
-                label_list.append(class_num)
-#     print(image_list, label_list)
-    return image_list, label_list
-
-def prep_image(image):
-    """
-    Preparation
-    """
-    if COLOUR_MODE == "grayscale":
-        image = tf.image.rgb_to_grayscale(image)
-        image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
-    
-    if COLOUR_MODE == "grayscale" and IMG_C == 3:
-        image = tf.image.grayscale_to_rgb(image)
-    
-    image = tf.image.resize(image, (IMG_H, IMG_W))
-    image = tf.cast(image, tf.float32)
-    image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
-    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
-    
-    return image
-
-def load_image_with_label(image_path, label):
-    img = tf.io.read_file(image_path)
-    img = tf.io.decode_png(img, channels=IMG_C)
-    img = prep_image(img)
-    
-    return img, label
-
-def tf_dataset_labels(images_path, batch_size):
-    
-    filenames, labels = read_data_with_labels(images_path, CLASS_NAME)
-#     print("testing")
-#     print(filenames, labels)
-    dataset = tf.data.Dataset.from_tensor_slices((filenames, labels))
-    dataset = dataset.shuffle(buffer_size=10240)
-    dataset = dataset.map(load_image_with_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return dataset
-
-
-# In[ ]:
-
-
-def transformShear(imgIn):
-    forward_transform = [[1.0,0.1,0],[0,1.0,0],[0,0,1.0]]
-    t = tfa.image.transform_ops.matrices_to_flat_transforms(tf.linalg.inv(forward_transform))
-    # please notice that forward_transform must be a float matrix,
-    # e.g. [[2.0,0,0],[0,1.0,0],[0,0,1]] will work
-    # but [[2,0,0],[0,1,0],[0,0,1]] will not
-    imgOut = tfa.image.transform(imgIn, t, interpolation="BILINEAR",name=None)
-    return imgOut
-
-
-def augment_dataset_batch_test(dataset_batch, random_aug=True):
-
-    transforms = [1, 0, -30, 0, 1, -30, 0, 0]
-    
-    translate = dataset_batch.map(lambda image, label: (tfa.image.translate(image, transforms), label),
-                                     num_parallel_calls=AUTOTUNE)
-    
-    
-    if random_aug:
-        
-        flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
-                                        num_parallel_calls=AUTOTUNE)
-        
-        flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
-                                     num_parallel_calls=AUTOTUNE)
-        
-        rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
-                                         num_parallel_calls=AUTOTUNE)
-        
-        # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, max_delta=0.3), label),
-        #                                  num_parallel_calls=AUTOTUNE)
-        
-        random_saturation = dataset_batch.map(lambda image, label: (tf.image.random_saturation(image, 5, 10), label),
-                                         num_parallel_calls=AUTOTUNE)
-        
-        shear = dataset_batch.map(lambda image, label: (transformShear(image), label),
-                                         num_parallel_calls=AUTOTUNE)
-        
-        dataset_batch = dataset_batch.concatenate(flip_up_down)
-        dataset_batch = dataset_batch.concatenate(flip_left_right)
-        dataset_batch = dataset_batch.concatenate(rot_90)
-        # dataset_batch = dataset_batch.concatenate(random_hue)
-        dataset_batch = dataset_batch.concatenate(random_saturation)
-        dataset_batch = dataset_batch.concatenate(shear)
-        
-    
-    
-    dataset_batch = dataset_batch.concatenate(translate)
-      
-
-    return dataset_batch
 
 
 # In[ ]:
@@ -324,6 +180,43 @@ class CustomSaver(tf.keras.callbacks.Callback):
 # In[ ]:
 
 
+def our_mobilenet(i_shape, base_lr, n_class):
+    model = tf.keras.models.Sequential()
+    
+    base_model = tf.keras.applications.MobileNet(weights="imagenet", input_shape=i_shape, include_top=False)
+    base_model.trainable = True
+        
+    if AUGMENTATION:
+        model.add(data_augmentation)    
+    
+    model.add(base_model)
+    
+    
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
+    model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.Dense(1024
+                                    ,activation = 'relu'
+                                   ))
+    model.add(tf.keras.layers.Dense(1024
+                                    ,activation = 'relu'
+                                   ))
+    model.add(tf.keras.layers.Dense(512
+                                    ,activation = 'relu'
+                                   ))
+    model.add(tf.keras.layers.Dense(n_class
+                                    ,activation="softmax"
+                                   ))
+    
+    model.compile(loss='sparse_categorical_crossentropy',
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+                  metrics=['accuracy'])
+    
+    return model
+
+
+# In[ ]:
+
+
 def build_our_model(i_shape, base_lr, n_class):
     
     model = tf.keras.models.Sequential()
@@ -395,49 +288,12 @@ def our_resnet50(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.AveragePooling2D())
     model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(128
+    model.add(tf.keras.layers.Dense(256
                                     ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
     model.add(tf.keras.layers.Dropout(0.5))
     
-    model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="softmax"
-                                   ))
-    
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
-                  metrics=['accuracy'])
-    
-    return model
-
-
-# In[ ]:
-
-
-def our_mobilenet(i_shape, base_lr, n_class):
-    model = tf.keras.models.Sequential()
-    
-    base_model = tf.keras.applications.MobileNet(weights=None, input_shape=i_shape, include_top=False)
-    base_model.trainable = True
-        
-    if AUGMENTATION:
-        model.add(data_augmentation)    
-    
-    model.add(base_model)
-    
-    
-    model.add(tf.keras.layers.GlobalAveragePooling2D())
-    model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(1024
-                                    ,activation = 'relu'
-                                   ))
-    model.add(tf.keras.layers.Dense(1024
-                                    ,activation = 'relu'
-                                   ))
-    model.add(tf.keras.layers.Dense(512
-                                    ,activation = 'relu'
-                                   ))
     model.add(tf.keras.layers.Dense(n_class
                                     ,activation="softmax"
                                    ))
@@ -457,9 +313,20 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     Evaluation Area
     """
     this_model.load_weights(p_model)
-    evaluation_ds = tf_dataset_labels(test_dataset_path, BATCH_SIZE)
+    
+    test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+    test_dataset = test_datagen.flow_from_directory(
+        directory=test_dataset_path,
+        target_size=(IMG_H, IMG_W),
+        color_mode=COLOUR_MODE,
+        batch_size=BATCH_SIZE,
+        class_mode="sparse",
+        shuffle=True,
+        seed=42
+    )
+    
     print("Evaluate")
-    result = this_model.evaluate(evaluation_ds)
+    result = this_model.evaluate(test_dataset)
     print(result)
     dict(zip(this_model.metrics_names, result))
 
@@ -487,7 +354,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                 img = tf.keras.utils.load_img(
                     filepath, target_size=(IMG_H, IMG_W)
                 )
-                img = prep_image(img)
+                
                 img_array = tf.keras.utils.img_to_array(img)
                 
                 img_array = tf.expand_dims(img_array, 0) # Create a batch
@@ -521,67 +388,41 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 # @tf.function
 def dataset_manipulation(train_data_path, val_data_path):
-        
-    train_dataset = tf_dataset_labels(train_data_path, BATCH_SIZE)
-    val_dataset = tf_dataset_labels(val_data_path, BATCH_SIZE)
     
-    # class_names = train_dataset.class_names
-    # print("name of classes: ", class_names, ", Size of classes: ", len(class_names))
-    
-    # print("Before: ")
-    # plt.figure(figsize=(10, 10))
-    # for images, labels in val_dataset.take(1):
-    #     for i in range(9):
-    #         ax = plt.subplot(3, 3,i+1)
-    #         plt.imshow(images[i].numpy().astype("uint8"))
-    #         plt.title(CLASS_NAME[labels[i]])
-    #         plt.axis("off")
-    # print(train_dataset)
-    
-    
-    
-    
-    
-    # if AUGMENTATION_REPEAT:
-    #     train_dataset = augment_dataset_batch_test(train_dataset)
-    #     val_dataset = augment_dataset_batch_test(val_dataset)
-    
-    
-    
-    # return train_dataset, val_dataset
-    if AUGMENTATION_REPEAT:
-        print("AUGMENTATION_REPEAT")
-        train_dataset = train_dataset.unbatch()
 
-    #     print(len(list(train_dataset)))
-        train_dataset_dict = {}
-        top_number_of_dataset = 0
-        # print("before preprocessing")
-        for a in range(0, 8):
-            filtered_dataset = train_dataset.filter(lambda x,y: tf.reduce_all(tf.equal(y, [a])))
-            len_current_dataset = len(list(filtered_dataset))
-            print("class: ", a, len_current_dataset)
-            if a in LOW_CLASS:
-                filtered_dataset = augment_dataset_batch_test(filtered_dataset)
-            elif a in MID_CLASS:
-                filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
-            train_dataset_dict[a] = filtered_dataset
-
-
-        print("===========================================")
-        
-        final_dataset = train_dataset_dict[0]
-        len_current_dataset = len(list(final_dataset))
-        print("class: ", 0, len_current_dataset)
-        for a in range (1, 8):
-            current_dataset = train_dataset_dict[a]
-            len_current_dataset = len(list(current_dataset))
-            print("class: ", a, len_current_dataset)
-            final_dataset = final_dataset.concatenate(current_dataset)
-
-        train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
+    train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+        rotation_range=15,
+        rescale=1./255,
+        shear_range=0.1,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        vertical_flip=True,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+    )
+    train_dataset = train_datagen.flow_from_directory(
+        directory=train_data_path,
+        target_size=(IMG_H, IMG_W),
+        color_mode=COLOUR_MODE,
+        batch_size=BATCH_SIZE,
+        class_mode="sparse",
+        shuffle=True,
+        seed=42
+    )
+    validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+    valid_dataset = validation_datagen.flow_from_directory(
+        directory=val_data_path,
+        target_size=(IMG_H, IMG_W),
+        color_mode=COLOUR_MODE,
+        batch_size=BATCH_SIZE,
+        class_mode="sparse",
+        shuffle=True,
+        seed=42
+    )
     
-    return train_dataset, val_dataset
+    
+    
+    return train_dataset, valid_dataset
 
 
 # In[ ]:
@@ -636,7 +477,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
     loss = fit_history_our_model.history['loss']
     val_loss = fit_history_our_model.history['val_loss']
 
-    epochs_range = range(epochs)
+    epochs_range = range(num_epochs)
 
     plt.figure(figsize=(8, 8))
     plt.subplot(1, 2, 1)
@@ -667,15 +508,13 @@ if __name__ == "__main__":
     '''
     
     # run the function here
-    """ Set Hyper parameters """
-    num_epochs = 100
-    choosen_model = 2 # 1 == our model, 2 == resnet50
     
-    name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
-    
-    if choosen_model == 1:
+    name_model = str(IMG_H)+"_pcb_"+str(NUM_EPOCHS)
+    if CHOOSEN_MODEL == 1:
         name_model = name_model + "-custom_model"
-    elif choosen_model == 2:
+    elif CHOOSEN_MODEL == 2:
+        name_model = name_model + "-mobilenet"
+    elif CHOOSEN_MODEL == 3:
         name_model = name_model + "-resnet50"
         
     print("start: ", name_model)
@@ -684,8 +523,8 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_final/test_training_dataset"
-    test_data_path = "image_dataset_final/evaluation_dataset"
+    train_data_path = "image_dataset_final/test_training_dataset/"
+    test_data_path = "image_dataset_final/evaluation_dataset/"
     saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
@@ -694,19 +533,35 @@ if __name__ == "__main__":
     
     train_dataset, val_dataset = dataset_manipulation(train_data_path, test_data_path)
     
-    if choosen_model == 1:
+        
+    if CHOOSEN_MODEL == 1:
         """
         our custom model
         """ 
         print("running", name_model)
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
         # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 2:
+        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+    elif CHOOSEN_MODEL == 2:
         """
-        resnet50
+        mobilenet
+        """
+        print("running", name_model)
+        our_model = our_mobilenet(input_shape, base_learning_rate, num_classes)
+        # our_model.summary()
+        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+    elif CHOOSEN_MODEL == 3:
+        """
+        mobilenet
         """
         print("running", name_model)
         our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+        # our_model.summary()
+        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+
+
+# In[ ]:
+
+
+
 
