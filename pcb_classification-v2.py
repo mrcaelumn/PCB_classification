@@ -19,15 +19,15 @@
 
 
 import tensorflow as tf
-import tensorflow_io as tfio
-import tensorflow_addons as tfa
+# import tensorflow_io as tfio
+# import tensorflow_addons as tfa
 
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import os
 import csv
-import tf_clahe
-import cv2
+# import tf_clahe
+# import cv2
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.utils import class_weight
@@ -45,6 +45,12 @@ IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
+
+# set dir of files
+TRAIN_DATASET_PATH = "image_dataset_final/test_training_dataset/"
+TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
+SAVED_MODEL_PATH = "saved_model/"
+    
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
 HIGH_CLASS = [0]
 MID_CLASS = [1, 4]
@@ -522,16 +528,12 @@ if __name__ == "__main__":
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
-    # set dir of files
-    train_data_path = "image_dataset_final/test_training_dataset/"
-    test_data_path = "image_dataset_final/evaluation_dataset/"
-    saved_model_path = "saved_model/"
     
     input_shape = (IMG_H, IMG_W, IMG_C)
     
-    path_model = saved_model_path + name_model + "_model" + ".h5"
+    path_model = SAVED_MODEL_PATH + name_model + "_model" + ".h5"
     
-    train_dataset, val_dataset = dataset_manipulation(train_data_path, test_data_path)
+    train_dataset, val_dataset = dataset_manipulation(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
     
         
     if CHOOSEN_MODEL == 1:
