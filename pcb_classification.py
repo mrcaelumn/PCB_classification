@@ -111,8 +111,7 @@ def prep_image(image):
     """
     if COLOUR_MODE == "grayscale":
         image = tf.image.rgb_to_grayscale(image)
-        
-    image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
+        image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
     
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
