@@ -176,9 +176,6 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
         
         rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
                                          num_parallel_calls=AUTOTUNE)
-
-        rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
-                                            num_parallel_calls=AUTOTUNE)
         
         random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, max_delta=0.3), label),
                                          num_parallel_calls=AUTOTUNE)
@@ -192,7 +189,6 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
         dataset_batch = dataset_batch.concatenate(flip_up_down)
         dataset_batch = dataset_batch.concatenate(flip_left_right)
         dataset_batch = dataset_batch.concatenate(rot_90)
-        dataset_batch = dataset_batch.concatenate(rot_180)
         dataset_batch = dataset_batch.concatenate(random_hue)
         dataset_batch = dataset_batch.concatenate(random_saturation)
         dataset_batch = dataset_batch.concatenate(shear)
@@ -541,7 +537,6 @@ def dataset_manipulation(train_data_path, val_data_path):
                 filtered_dataset = augment_dataset_batch_test(filtered_dataset)
             elif a in MID_CLASS:
                 filtered_dataset = augment_dataset_batch_test(filtered_dataset, False)
-
             train_dataset_dict[a] = filtered_dataset
 
 
@@ -551,9 +546,14 @@ def dataset_manipulation(train_data_path, val_data_path):
         len_current_dataset = len(list(final_dataset))
         print("class: ", 0, len_current_dataset)
         for a in range (1, 8):
+            current_dataset = train_dataset_dict[a]
             len_current_dataset = len(list(train_dataset_dict[a]))
             print("class: ", a, len_current_dataset)
-            final_dataset = final_dataset.concatenate(train_dataset_dict[a])
+            if len_current_dataset < 2500:
+                times_multi = int(3000/len_current_dataset)
+                print("class: ", a, "duplicate: ",times_multi)
+                current_dataset = current_dataset.repeat(times_multi)
+            final_dataset = final_dataset.concatenate(current_dataset)
 
         train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
     
