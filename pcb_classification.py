@@ -331,62 +331,25 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-
-def build_our_model_v2(i_shape, base_lr, n_class):
-    
-    model = tf.keras.models.Sequential()
-    
-    if AUGMENTATION:
-        model.add(data_augmentation)
-        
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D())
-    
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
-    
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D())
-    
-    model.add(tf.keras.layers.Dropout(0.2))
-    
-    model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(256))
-    model.add(tf.keras.layers.LeakyReLU())
-
-    
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
-    
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
-                  metrics=['accuracy'])
-    
-    return model
-
-
-# In[ ]:
-
-
 def our_resnet50(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.ResNet50V2(weights='imagenet', input_shape=i_shape, include_top=False)
+    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=True)
 
-    for layer in base_model.layers:
-        layer.trainable = False
+    # for layer in base_model.layers:
+    #     layer.trainable = False
         
     if AUGMENTATION:
         model.add(data_augmentation)    
     
     model.add(base_model)
     
-    model.add(tf.keras.layers.GlobalAveragePooling2D())
-    model.add(tf.keras.layers.Dense(128, activation = 'relu'))
-    model.add(tf.keras.layers.Dropout(0.2))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Flatten())
+    
+    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
+    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
+    model.add(tf.keras.layers.Dense(100, activation = 'relu'))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -401,7 +364,7 @@ def our_resnet50(i_shape, base_lr, n_class):
 def our_efficientnet(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = False, weights = "imagenet", classes=n_class)
+    base_model = tf.keras.applications.efficientnet.EfficientNetB0(input_shape = i_shape, include_top = True, weights = None, classes=n_class)
     # base_model.summary()
     # base_model.trainable = True
         
@@ -411,42 +374,6 @@ def our_efficientnet(i_shape, base_lr, n_class):
         
     
     model.add(base_model)
-    
-    model.add(tf.keras.layers.GlobalAveragePooling2D())
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
-    
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
-                  metrics=['accuracy'])
-    
-    return model
-
-
-# In[ ]:
-
-
-def our_desnet(i_shape, base_lr, n_class):
-    model = tf.keras.models.Sequential()
-    
-    base_model = tf.keras.applications.DenseNet121(input_shape = i_shape, include_top = False, weights = "imagenet")
-    # base_model.summary()
-    # base_model.trainable = True
-        
-    
-    if AUGMENTATION:
-        model.add(data_augmentation)
-        
-    
-    model.add(base_model)
-    
-    model.add(tf.keras.layers.GlobalAveragePooling2D())
-    
-    # model.add(tf.keras.layers.Dense(512))
-    # model.add(tf.keras.layers.LeakyReLU())
-    # model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -544,7 +471,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # validation_split=0.15,
         # subset="training",
         batch_size=BATCH_SIZE,
-        seed=123,
+        # seed=123,
         color_mode=COLOUR_MODE,
         image_size=(IMG_H, IMG_W))
 
@@ -695,7 +622,7 @@ if __name__ == "__main__":
     # run the function here
     """ Set Hyper parameters """
     num_epochs = 100
-    choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet, 4 == desnet, 5 == custom_model_v2
+    choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet, 5 == custom_model_v2
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
     
@@ -705,13 +632,9 @@ if __name__ == "__main__":
         name_model = name_model + "-resnet50"
     elif choosen_model == 3:
         name_model = name_model + "-efficientnet"
-    elif choosen_model == 4:
-        name_model = name_model + "-desnet"
-    elif choosen_model == 5:
-        name_model = name_model + "-custom_model_v2"
         
     print("start: ", name_model)
-    base_learning_rate = 0.00002
+    base_learning_rate = 0.0002
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -747,19 +670,5 @@ if __name__ == "__main__":
         """
         print("running", name_model)
         our_model = our_efficientnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 4:
-        """
-        desnet
-        """
-        print("running", name_model)
-        our_model = our_desnet(input_shape, base_learning_rate, num_classes)
-        __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
-    elif choosen_model == 5:
-        """
-        our custom model v2
-        """
-        print("running", name_model)
-        our_model = build_our_model_v2(input_shape, base_learning_rate, num_classes)
         __run__(our_model, train_dataset, val_dataset,num_epochs, path_model, name_model, class_name)
 
