@@ -727,19 +727,19 @@ if __name__ == "__main__":
     
     train_dataset, val_dataset = dataset_manipulation(train_data_path, test_data_path)
     
-    # if choosen_model == 1:
-    #     """
-    #     our custom model
-    #     """ 
-    #     print("running", name_model)
-    #     our_model = build_our_model(input_shape, base_learning_rate, num_classes)
-    #     # our_model.summary()
-    #     __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
-    # elif choosen_model == 2:
-    #     """
-    #     resnet50
-    #     """
-    #     print("running", name_model)
-    #     our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
-    #     __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+    if choosen_model == 1:
+        """
+        our custom model
+        """ 
+        print("running", name_model)
+        our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+        # our_model.summary()
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
+    elif choosen_model == 2:
+        """
+        resnet50
+        """
+        print("running", name_model)
+        our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
+        __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name)
 
