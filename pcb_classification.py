@@ -337,7 +337,7 @@ def build_our_model(i_shape, base_lr, n_class):
 def our_resnet50(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=True)
+    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=False)
 
     # for layer in base_model.layers:
     #     layer.trainable = False
