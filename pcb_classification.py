@@ -148,48 +148,59 @@ def tf_dataset_labels(images_path, batch_size):
 # In[ ]:
 
 
-def augment_dataset_batch_test(dataset_batch, random_aug=False):
-    
-    noise = tf.random.normal(shape=(IMG_H, IMG_W, IMG_C), mean=0.0, stddev=1.0,dtype=tf.float32)
-    
-    
-    flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
-                                     num_parallel_calls=AUTOTUNE)
+def transformShear(imgIn):
+    forward_transform = [[1.0,0.1,0],[0,1.0,0],[0,0,1.0]]
+    t = tfa.image.transform_ops.matrices_to_flat_transforms(tf.linalg.inv(forward_transform))
+    # please notice that forward_transform must be a float matrix,
+    # e.g. [[2.0,0,0],[0,1.0,0],[0,0,1]] will work
+    # but [[2,0,0],[0,1,0],[0,0,1]] will not
+    imgOut = tfa.image.transform(imgIn, t, interpolation="BILINEAR",name=None)
+    return imgOut
 
-    flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
-                                        num_parallel_calls=AUTOTUNE)
+
+def augment_dataset_batch_test(dataset_batch, random_aug=True):
+
+    transforms = [1, 0, -30, 0, 1, -30, 0, 0]
     
+    translate = dataset_batch.map(lambda image, label: (tfa.image.translate(image, transforms), label),
+                                     num_parallel_calls=AUTOTUNE)
     
     
     if random_aug:
         
-        random_flip_up_down = dataset_batch.map(lambda image, label: (tf.image.random_flip_up_down(image), label),
-                                         num_parallel_calls=AUTOTUNE)
-
-        random_flip_left_right = dataset_batch.map(lambda image, label: (tf.image.random_flip_left_right(image), label),
-                                            num_parallel_calls=AUTOTUNE)
-
+        flip_left_right = dataset_batch.map(lambda image, label: (tf.image.flip_left_right(image), label),
+                                        num_parallel_calls=AUTOTUNE)
+        
+        flip_up_down = dataset_batch.map(lambda image, label: (tf.image.flip_up_down(image), label),
+                                     num_parallel_calls=AUTOTUNE)
+        
         rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
                                          num_parallel_calls=AUTOTUNE)
 
         rot_180 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=2), label),
                                             num_parallel_calls=AUTOTUNE)
         
-        noise_random = dataset_batch.map(lambda image, label: (tf.add(image, noise), label),
-                                        num_parallel_calls=AUTOTUNE)
-    
-    dataset_batch = dataset_batch.concatenate(flip_up_down)
-    dataset_batch = dataset_batch.concatenate(flip_left_right)
-    
-    
-    if random_aug:
-        dataset_batch = dataset_batch.concatenate(random_flip_up_down)
-        dataset_batch = dataset_batch.concatenate(random_flip_left_right)
-
+        random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, max_delta=0.3), label),
+                                         num_parallel_calls=AUTOTUNE)
+        
+        random_saturation = dataset_batch.map(lambda image, label: (tf.image.random_saturation(image, 5, 10), label),
+                                         num_parallel_calls=AUTOTUNE)
+        
+        shear = dataset_batch.map(lambda image, label: (transformShear(image), label),
+                                         num_parallel_calls=AUTOTUNE)
+        
+        dataset_batch = dataset_batch.concatenate(flip_up_down)
+        dataset_batch = dataset_batch.concatenate(flip_left_right)
         dataset_batch = dataset_batch.concatenate(rot_90)
         dataset_batch = dataset_batch.concatenate(rot_180)
+        dataset_batch = dataset_batch.concatenate(random_hue)
+        dataset_batch = dataset_batch.concatenate(random_saturation)
+        dataset_batch = dataset_batch.concatenate(shear)
         
-        dataset_batch = dataset_batch.concatenate(noise_random)
+    
+    
+    dataset_batch = dataset_batch.concatenate(translate)
+      
 
     return dataset_batch
 
@@ -644,12 +655,12 @@ if __name__ == "__main__":
         name_model = name_model + "-resnet50"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0001
+    base_learning_rate = 0.00001
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_ori/training_dataset"
+    train_data_path = "image_dataset_ori/test_training_dataset"
     test_data_path = "image_dataset_ori/evaluation_dataset"
     saved_model_path = "saved_model/"
     
