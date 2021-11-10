@@ -90,7 +90,8 @@ def enchantment_image(image):
     image = tf_clahe.clahe(image)
     
     image = tf.cast(image, tf.float32)
-    image = image / 255.0 # range 0 to 1
+    # image = image / 255.0 # range 0 to 1
+    image = (image - 127.5) / 127.5 # range -1 to 1
     
     return image
 
