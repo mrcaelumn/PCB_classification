@@ -121,7 +121,7 @@ def prep_image(image):
         
     image = tf.image.resize(image, (IMG_H, IMG_W))
     image = tf.cast(image, tf.float32)
-    image = (image - 255.0)  # rescailing image from 0,255 to 0, 1
+    image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
     # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
     
     return image
