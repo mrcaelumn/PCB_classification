@@ -692,7 +692,7 @@ if __name__ == "__main__":
     
     # run the function here
     """ Set Hyper parameters """
-    num_epochs = 1
+    num_epochs = 100
     choosen_model = 1 # 1 == our model, 2 == resnet50, 3 == efficientnet, 4 == desnet, 5 == custom_model_v2
     
     name_model = str(IMG_H)+"_pcb_"+str(num_epochs)
@@ -714,7 +714,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_resmpling_low_class/test_training_dataset"
+    train_data_path = "image_dataset_resmpling_low_class/training_dataset"
     test_data_path = "image_dataset_resmpling_low_class/evaluation_dataset"
     saved_model_path = "saved_model/"
     
