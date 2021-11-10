@@ -86,70 +86,6 @@ def random_hue(tensor):
     return tensor
 
 
-'''
-    Function for Balance Contrast Enhancement Technique (BCET)
-    This technique provides solution to biased color (RGB) composition. 
-    The contrast of the image can be stretched or compressed without changing the histogram pattern of the input image(x).
-    The solution is based on the parabolic function obtained from the input image.
-'''
-@tf.function
-def bcet(img):
-
-    
-    Lmin = tf.reduce_min(img) # MINIMUM OF INPUT IMAGE
-#     Lmin = np.min(img) # MINIMUM OF INPUT IMAGE
-#     print("Lmin", Lmin)
-    Lmax = tf.reduce_max(img) # MAXIMUM OF INPUT IMAGE
-#     Lmax = np.max(img) # MAXIMUM OF INPUT IMAGE
-#     print("Lmax", Lmax)
-    Lmean = tf.reduce_mean(img) #MEAN OF INPUT IMAGE
-#     Lmean = np.mean(img) #MEAN OF INPUT IMAGE
-#     print("Lmean", Lmean)
-    LMssum = tf.reduce_mean(img * img) #MEAN SQUARE SUM OF INPUT IMAGE
-#     LMssum = np.mean(pow(img, 2)) #MEAN SQUARE SUM OF INPUT IMAGE
-#     print("LMssum", LMssum)
-
-    Gmin = tf.constant(0, dtype="float32") #MINIMUM OF OUTPUT IMAGE
-    Gmax = tf.constant(255, dtype="float32") #MAXIMUM OF OUTPUT IMAGE
-    Gmean = tf.constant(110, dtype="float32") #MEAN OF OUTPUT IMAGE
-    
-    subber = tf.constant(2, dtype="float32")
-    
-    # find b
-    
-    bnum = ((Lmax**subber)*(Gmean-Gmin)) - (LMssum*(Gmax-Gmin)) + ((Lmin**subber) *(Gmax-Gmean))
-    bden = subber * ((Lmax*(Gmean-Gmin)) - (Lmean*(Gmax-Gmin)) + (Lmin*(Gmax-Gmean)))
-    
-    b = bnum/bden
-    
-    # find a
-    a1 = Gmax-Gmin
-    a2 = Lmax-Lmin
-    a3 = Lmax+Lmin-(subber*b)
-            
-    a = a1/(a2*a3)
-    
-    # find c
-    c = Gmin - (a*(Lmin-b)**subber)
-    
-    # Process raster
-    y = a*((img - b)**subber) + c #PARABOLIC FUNCTION
-
-    return y
-
-def bcet_processing(img,channels=3):
-    img = tf.cast(img, tf.float32)
-    layers = []
-    for i in range(channels):
-        layer = img[:,:,i]
-        layer = bcet(layer)
-        layers.append(layer)
-        
-    final_image = tf.stack(layers, axis=-1)
-
-    return final_image
-
-
 # In[ ]:
 
 
@@ -176,12 +112,11 @@ def prep_image(image):
     if COLOUR_MODE == "grayscale":
         image = tf.image.rgb_to_grayscale(image)
         
-    # image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
+    image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
     
     if COLOUR_MODE == "grayscale" and IMG_C == 3:
         image = tf.image.grayscale_to_rgb(image)
     
-    image = bcet_processing(image)
     image = tf.image.resize(image, (IMG_H, IMG_W))
     image = tf.cast(image, tf.float32)
     image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
@@ -455,16 +390,17 @@ def our_resnet50(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Dense(128
                                     ,activation = 'relu'
-                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
     
     model.add(tf.keras.layers.Dense(128
                                     ,activation = 'relu'
-                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
     
     model.add(tf.keras.layers.Dense(128
                                     ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
     
     model.add(tf.keras.layers.Dense(n_class
