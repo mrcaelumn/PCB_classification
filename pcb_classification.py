@@ -176,8 +176,8 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
         rot_90 = dataset_batch.map(lambda image, label: (tf.image.rot90(image, k=1), label),
                                          num_parallel_calls=AUTOTUNE)
         
-        random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, max_delta=0.3), label),
-                                         num_parallel_calls=AUTOTUNE)
+        # random_hue = dataset_batch.map(lambda image, label: (tf.image.random_hue(image, max_delta=0.3), label),
+        #                                  num_parallel_calls=AUTOTUNE)
         
         random_saturation = dataset_batch.map(lambda image, label: (tf.image.random_saturation(image, 5, 10), label),
                                          num_parallel_calls=AUTOTUNE)
@@ -188,7 +188,7 @@ def augment_dataset_batch_test(dataset_batch, random_aug=True):
         dataset_batch = dataset_batch.concatenate(flip_up_down)
         dataset_batch = dataset_batch.concatenate(flip_left_right)
         dataset_batch = dataset_batch.concatenate(rot_90)
-        dataset_batch = dataset_batch.concatenate(random_hue)
+        # dataset_batch = dataset_batch.concatenate(random_hue)
         dataset_batch = dataset_batch.concatenate(random_saturation)
         dataset_batch = dataset_batch.concatenate(shear)
         
@@ -384,30 +384,22 @@ def build_our_model(i_shape, base_lr, n_class):
 def our_resnet50(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.ResNet50(weights="imagenet", input_shape=i_shape, include_top=False)
-    base_model.trainable = False
+    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=False)
+    base_model.trainable = True
         
     if AUGMENTATION:
         model.add(data_augmentation)    
     
     model.add(base_model)
     
+    
+    model.add(tf.keras.layers.AveragePooling2D())
     model.add(tf.keras.layers.Flatten())
-    
     model.add(tf.keras.layers.Dense(128
                                     ,activation = 'relu'
                                     ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
                                    ))
-    
-    model.add(tf.keras.layers.Dense(128
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
-                                   ))
-    
-    model.add(tf.keras.layers.Dense(128
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
-                                   ))
+    model.add(tf.keras.layers.Dropout(0.5))
     
     model.add(tf.keras.layers.Dense(n_class
                                     ,activation="softmax"
@@ -546,12 +538,8 @@ def dataset_manipulation(train_data_path, val_data_path):
         print("class: ", 0, len_current_dataset)
         for a in range (1, 8):
             current_dataset = train_dataset_dict[a]
-            len_current_dataset = len(list(train_dataset_dict[a]))
+            len_current_dataset = len(list(current_dataset))
             print("class: ", a, len_current_dataset)
-            if len_current_dataset < 2500:
-                times_multi = int(3000/len_current_dataset)
-                print("class: ", a, "duplicate: ",times_multi)
-                current_dataset = current_dataset.repeat(times_multi)
             final_dataset = final_dataset.concatenate(current_dataset)
 
         train_dataset = final_dataset.batch(BATCH_SIZE).prefetch(AUTOTUNE)
@@ -659,7 +647,7 @@ if __name__ == "__main__":
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
     # set dir of files
-    train_data_path = "image_dataset_final/training_dataset"
+    train_data_path = "image_dataset_final/test_training_dataset"
     test_data_path = "image_dataset_final/evaluation_dataset"
     saved_model_path = "saved_model/"
     
