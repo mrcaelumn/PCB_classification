@@ -38,7 +38,7 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 2
+NUM_EPOCHS = 100
 CHOOSEN_MODEL = 3 # 1 == our model, 2 == mobilenet, 3 == resnet18
 IMG_H = 110
 IMG_W = 42
@@ -47,8 +47,8 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_ori/test_training_dataset/"
-TEST_DATASET_PATH = "image_dataset_ori/evaluation_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final/training_dataset/"
+TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
@@ -485,12 +485,12 @@ def dataset_manipulation(train_data_path, val_data_path):
         # rescale=1./255,
         # shear_range=0.1,
         # zoom_range=0.15,
-        brightness_range=[1.0,1.5],
+        brightness_range=[0.9, 1.5],
         horizontal_flip=True,
         vertical_flip=True,
         width_shift_range=0.2,
         height_shift_range=0.2,
-        validation_split=0.2,
+        # validation_split=0.2,
     )
     
     train_dataset = train_datagen.flow_from_directory(
@@ -500,20 +500,21 @@ def dataset_manipulation(train_data_path, val_data_path):
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
-        seed=42,
-        subset='training'
+        seed=123,
+        # subset='training'
     )
         
-    
-    valid_dataset = train_datagen.flow_from_directory(
-        directory=train_data_path,
+    valid_datagen = tf.keras.preprocessing.image.ImageDataGenerator()
+        
+    valid_dataset = valid_datagen.flow_from_directory(
+        directory=val_data_path,
         target_size=(IMG_H, IMG_W),
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
-        seed=42,
-        subset='validation'
+        seed=123,
+        # subset='validation'
     )
     
 #     if COLOUR_MODE == "grayscale":
