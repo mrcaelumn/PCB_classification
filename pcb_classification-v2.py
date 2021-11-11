@@ -220,7 +220,7 @@ def our_mobilenet(i_shape, base_lr, n_class):
     
     
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="tanh"
+                                    ,activation="softmax"
                                    ))
     
     model.compile(loss='sparse_categorical_crossentropy',
@@ -274,13 +274,12 @@ def build_our_model(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Flatten())
 
-    model.add(tf.keras.layers.Dense(128,
-                                    kernel_initializer="he_uniform",
-                                    activity_regularizer=tf.keras.regularizers.l2(0.01)))
+    model.add(tf.keras.layers.Dense(512,
+                                    kernel_initializer="he_uniform"))
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -304,7 +303,7 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(base_model)
     
     
-    model.add(tf.keras.layers.AveragePooling2D())
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dense(512,
@@ -313,7 +312,7 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dropout(0.5))
     
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="tanh"
+                                    ,activation="softmax"
                                    ))
     
     model.compile(loss='sparse_categorical_crossentropy',
