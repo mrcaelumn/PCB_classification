@@ -453,7 +453,7 @@ def dataset_manipulation(train_data_path, val_data_path):
     
 
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        rotation_range=20,
+        # rotation_range=20,
         rescale=1./255,
         shear_range=0.1,
         zoom_range=0.15,
@@ -469,7 +469,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
-        shuffle=True,
+        # shuffle=True,
         seed=42,
     )
     validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
@@ -482,7 +482,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
-        shuffle=True,
+        # shuffle=True,
         seed=42
     )
     
