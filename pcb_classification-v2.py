@@ -74,6 +74,24 @@ data_augmentation = tf.keras.Sequential([
     tf.keras.layers.GaussianNoise(0.1),
 ])
 
+def prep_image(image):
+    """
+    Preparation
+    """
+    if COLOUR_MODE == "grayscale":
+        image = tf.image.rgb_to_grayscale(image)
+        image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
+    
+    if COLOUR_MODE == "grayscale" and IMG_C == 3:
+        image = tf.image.grayscale_to_rgb(image)
+    
+    # image = tf.image.resize(image, (IMG_H, IMG_W))
+    # image = tf.cast(image, tf.float32)
+    # image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
+    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
+    
+    return image
+
 
 # In[ ]:
 
@@ -405,6 +423,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         vertical_flip=True,
         width_shift_range=0.1,
         height_shift_range=0.1,
+        
     )
     train_dataset = train_datagen.flow_from_directory(
         directory=train_data_path,
@@ -415,7 +434,10 @@ def dataset_manipulation(train_data_path, val_data_path):
         shuffle=True,
         seed=42
     )
-    validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale=1./255)
+    validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+        rescale=1./255,
+    )
+    
     valid_dataset = validation_datagen.flow_from_directory(
         directory=val_data_path,
         target_size=(IMG_H, IMG_W),
@@ -500,7 +522,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
     plt.show()
     plt.savefig(name_model+'_trainning_result.png')
 
-    evaluate_and_testing(our_model, path_model, test_data_path, class_name)
+    evaluate_and_testing(our_model, path_model, TEST_DATASET_PATH, class_name)
 
 
 # In[ ]:
