@@ -26,7 +26,7 @@ import numpy as np
 # import pandas as pd
 import os
 import csv
-# import tf_clahe
+import tf_clahe
 # import cv2
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
@@ -47,7 +47,7 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final/test_training_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final/training_dataset/"
 TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
@@ -59,6 +59,7 @@ CLASS_NAME = ["0","1","2", "3","4", "5", "6", "7"]
 
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
+TRAIN_MODE = True
 
 
 # In[ ]:
@@ -69,8 +70,8 @@ Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomFlip("horizontal_and_vertical", input_shape=(IMG_H, IMG_W, IMG_C)),
-    tf.keras.layers.RandomContrast(0.2),
-    tf.keras.layers.GaussianNoise(0.1),
+    tf.keras.layers.RandomContrast(0.1),
+    # tf.keras.layers.GaussianNoise(0.1),
 ])
 
 
@@ -201,25 +202,25 @@ def our_mobilenet(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.BatchNormalization())
     
-    model.add(tf.keras.layers.Dense(1024
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
-                                   ))
+    model.add(tf.keras.layers.Dense(1024,
+                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(1024
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
-                                   ))
+    
+    model.add(tf.keras.layers.Dense(1024,
+                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(512
-                                    ,activation = 'relu'
-                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
-                                   ))
     
     
-    model.add(tf.keras.layers.Dropout(0.5))    
+    model.add(tf.keras.layers.Dense(512,
+                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.Dropout(0.5))
+    
+    
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="softmax"
+                                    ,activation="tanh"
                                    ))
     
     model.compile(loss='sparse_categorical_crossentropy',
@@ -306,14 +307,13 @@ def our_resnet50(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.AveragePooling2D())
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Dense(256
-                                    ,activation = 'relu'
-                                    # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
-                                   ))
+    model.add(tf.keras.layers.Dense(512,
+                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
     
     model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="softmax"
+                                    ,activation="tanh"
                                    ))
     
     model.compile(loss='sparse_categorical_crossentropy',
@@ -321,6 +321,29 @@ def our_resnet50(i_shape, base_lr, n_class):
                   metrics=['accuracy'])
     
     return model
+
+
+# In[ ]:
+
+
+# @tf.function
+def prep_image(image, label = None):
+    """
+    Preparation
+    """
+    if COLOUR_MODE == "grayscale":
+        image = tf.image.rgb_to_grayscale(image)
+        image = tf_clahe.clahe(image, tile_grid_size=(8, 8), clip_limit=2.0) 
+    
+    if COLOUR_MODE == "grayscale" and IMG_C == 3:
+        image = tf.image.grayscale_to_rgb(image)
+    
+    # image = tf.image.resize(image, (IMG_H, IMG_W))
+    # image = tf.cast(image, tf.float32)
+    # image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
+    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
+    
+    return image, label
 
 
 # In[ ]:
@@ -336,12 +359,35 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
     test_dataset = test_datagen.flow_from_directory(
         directory=test_dataset_path,
         target_size=(IMG_H, IMG_W),
-        color_mode=COLOUR_MODE,
+        color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
         seed=42
     )
+    
+    if COLOUR_MODE == "grayscale":
+        f_test_dataset = tf.data.Dataset.from_generator(
+            lambda: test_dataset,
+            output_types = (tf.float32, tf.int64),
+        )
+        # plt.figure(figsize=(10, 10))
+        # for images, labels in f_test_dataset.take(1):
+        #     for i in range(9):
+        #         ax = plt.subplot(3, 3,i+1)
+        #         plt.imshow(images[i].numpy().astype("uint8"))
+        #         plt.title(CLASS_NAME[labels[i]])
+        #         plt.axis("off")
+
+        test_dataset = f_train_dataset.map(prep_image)
+        
+        # plt.figure(figsize=(10, 10))
+        # for images, labels in test_dataset.take(1):
+        #     for i in range(9):
+        #         ax = plt.subplot(3, 3,i+1)
+        #         plt.imshow(images[i].numpy().astype("uint8"))
+        #         plt.title(CLASS_NAME[labels[i]])
+        #         plt.axis("off")
     
     print("Evaluate")
     result = this_model.evaluate(test_dataset)
@@ -372,10 +418,10 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
                 img = tf.keras.utils.load_img(
                     filepath, target_size=(IMG_H, IMG_W)
                 )
-                
+                img , _ = prep_image(img, class_num)
                 img_array = tf.keras.utils.img_to_array(img)
-                
-                img_array = tf.expand_dims(img_array, 0) # Create a batch
+                img_array = img_array/255.5 # normalize
+                img_array = tf.expand_dims(img_array, axis=0) # Create a batch
 
                 pred_result = this_model.predict(img_array)
                 # Generate arg maxes for predictions
@@ -404,39 +450,18 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 # In[ ]:
 
 
-# @tf.function
-def prep_image(image, label):
-    """
-    Preparation
-    """
-    if COLOUR_MODE == "grayscale":
-        image = tf.image.rgb_to_grayscale(image)
-        # image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
-    
-    if COLOUR_MODE == "grayscale" and IMG_C == 3:
-        image = tf.image.grayscale_to_rgb(image)
-    
-    # image = tf.image.resize(image, (IMG_H, IMG_W))
-    # image = tf.cast(image, tf.float32)
-    # image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
-    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
-    
-    return image, label
-
-
 def dataset_manipulation(train_data_path, val_data_path):
     
 
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        rotation_range=15,
+        rotation_range=20,
         rescale=1./255,
         shear_range=0.1,
-        zoom_range=0.2,
+        zoom_range=0.15,
         horizontal_flip=True,
-        vertical_flip=True,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        # preprocessing_function=gray_to_rgb
+        # vertical_flip=True,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
         
     )
     train_dataset = train_datagen.flow_from_directory(
@@ -450,7 +475,6 @@ def dataset_manipulation(train_data_path, val_data_path):
     )
     validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rescale=1./255,
-        # preprocessing_function=gray_to_rgb
     )
     
     valid_dataset = validation_datagen.flow_from_directory(
@@ -463,15 +487,53 @@ def dataset_manipulation(train_data_path, val_data_path):
         seed=42
     )
     
-#     if COLOUR_MODE == "grayscale":
+    if COLOUR_MODE == "grayscale":
     
-#         f_train_dataset = tf.data.Dataset.from_generator(train_dataset)
-#         f_valid_dataset = tf.data.Dataset.from_generator(valid_dataset)
-
-#         f_train_dataset = f_train_dataset.map(prep_image)
-#         f_valid_dataset = f_valid_dataset.map(prep_image)
+        f_train_dataset = tf.data.Dataset.from_generator(
+            lambda: train_dataset,
+            output_types = (tf.float32, tf.int64),
+            output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
+        )
+        f_valid_dataset = tf.data.Dataset.from_generator(
+            lambda: valid_dataset,
+            output_types = (tf.float32, tf.int64),
+            output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
+        )
         
-#         return f_train_dataset, f_valid_dataset
+        # plt.figure(figsize=(10, 10))
+        # for images, labels in f_valid_dataset.take(1):
+        #     for i in range(9):
+        #         ax = plt.subplot(3, 3,i+1)
+        #         plt.imshow(images[i].numpy().astype("uint8"))
+        #         plt.title(CLASS_NAME[labels[i]])
+        #         plt.axis("off")
+        
+        train_ds = (
+            f_train_dataset
+            # .shuffle(1000)
+            .map(prep_image, num_parallel_calls=AUTOTUNE)
+            # .batch(BATCH_SIZE)
+            .prefetch(AUTOTUNE)
+        )
+        
+        valid_ds = (
+            f_valid_dataset
+            # .shuffle(1000)
+            .map(prep_image, num_parallel_calls=AUTOTUNE)
+            # .batch(BATCH_SIZE)
+            .prefetch(AUTOTUNE)
+        )
+
+        
+        # plt.figure(figsize=(10, 10))
+        # for images, labels in valid_ds.take(1):
+        #     for i in range(9):
+        #         ax = plt.subplot(3, 3,i+1)
+        #         plt.imshow(images[i].numpy().astype("uint8"))
+        #         plt.title(CLASS_NAME[labels[i]])
+        #         plt.axis("off")
+                
+        return train_ds, valid_ds
     
     
     return train_dataset, valid_dataset
@@ -487,7 +549,7 @@ def exponential_decay(lr0, s):
 
 
 def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
-    
+    print("running", name_model)
 #     y = np.concatenate([y for x, y in train_dataset], axis=0)
 #     print(dict(zip(*np.unique(y, return_counts=True))))
 #     class_weights = class_weight.compute_class_weight(
@@ -500,52 +562,61 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
     
 #     print("class_weights: ", train_class_weights)
 
-    
-    saver_callback = CustomSaver(
-        path_model,
-        name_model
-    )
-    
-    
-    exponential_decay_fn = exponential_decay(0.01, 20)
-    lr_scheduler = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
-    
-    
-    fit_history_our_model = our_model.fit(
-        train_dataset,
-        epochs=num_epochs,
-        validation_data=val_dataset,
-        batch_size=BATCH_SIZE,
-        # class_weight=train_class_weights,
-        callbacks=[
-            saver_callback, 
-            # lr_scheduler
-        ]   
-    )
-    
-    acc = fit_history_our_model.history['accuracy']
-    val_acc = fit_history_our_model.history['val_accuracy']
+    if TRAIN_MODE:
+        saver_callback = CustomSaver(
+            path_model,
+            name_model
+        )
 
-    loss = fit_history_our_model.history['loss']
-    val_loss = fit_history_our_model.history['val_loss']
+        es = tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss', 
+            mode='min', 
+            verbose=1, 
+            patience=15, 
+            restore_best_weights=True
+        )
 
-    epochs_range = range(num_epochs)
 
-    plt.figure(figsize=(8, 8))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Training Accuracy')
-    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
-    plt.legend(loc='lower right')
-    plt.title('Training and Validation Accuracy')
+        exponential_decay_fn = exponential_decay(0.01, 20)
+        lr_scheduler = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Training Loss')
-    plt.plot(epochs_range, val_loss, label='Validation Loss')
-    plt.legend(loc='upper right')
-    plt.title('Training and Validation Loss')
-    plt.show()
-    plt.savefig(name_model+'_trainning_result.png')
 
+        fit_history_our_model = our_model.fit(
+            train_dataset,
+            epochs=num_epochs,
+            validation_data=val_dataset,
+            batch_size=BATCH_SIZE,
+            # class_weight=train_class_weights,
+            callbacks=[
+                saver_callback,
+                es
+                # lr_scheduler
+            ]   
+        )
+
+        acc = fit_history_our_model.history['accuracy']
+        val_acc = fit_history_our_model.history['val_accuracy']
+
+        loss = fit_history_our_model.history['loss']
+        val_loss = fit_history_our_model.history['val_loss']
+
+        epochs_range = range(num_epochs)
+
+        plt.figure(figsize=(8, 8))
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs_range, acc, label='Training Accuracy')
+        plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+        plt.legend(loc='lower right')
+        plt.title('Training and Validation Accuracy')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs_range, loss, label='Training Loss')
+        plt.plot(epochs_range, val_loss, label='Validation Loss')
+        plt.legend(loc='upper right')
+        plt.title('Training and Validation Loss')
+        plt.show()
+        plt.savefig(name_model+'_trainning_result.png')
+    
     evaluate_and_testing(our_model, path_model, TEST_DATASET_PATH, class_name)
 
 
@@ -582,28 +653,22 @@ if __name__ == "__main__":
     train_dataset, val_dataset = dataset_manipulation(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
     
         
-    if CHOOSEN_MODEL == 1:
-        """
-        our custom model
-        """ 
-        print("running", name_model)
-        our_model = build_our_model(input_shape, base_learning_rate, num_classes)
-        # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
-    elif CHOOSEN_MODEL == 2:
+    """
+    our custom model
+    """ 
+    our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+    # our_model.summary()
+        
+    if CHOOSEN_MODEL == 2:
         """
         mobilenet
         """
-        print("running", name_model)
         our_model = our_mobilenet(input_shape, base_learning_rate, num_classes)
-        # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
     elif CHOOSEN_MODEL == 3:
         """
         mobilenet
         """
-        print("running", name_model)
         our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
-        # our_model.summary()
-        __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+    
+    __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
 
