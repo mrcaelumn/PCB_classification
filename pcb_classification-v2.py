@@ -38,7 +38,7 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 2
+NUM_EPOCHS = 50
 CHOOSEN_MODEL = 2 # 1 == our model, 2 == mobilenet, 3 == resnet50
 IMG_H = 224
 IMG_W = 224
