@@ -555,34 +555,33 @@ def dataset_manipulation(train_data_path, val_data_path):
         # zoom_range=0.15,
         brightness_range=[1.0,1.5],
         horizontal_flip=True,
-        # vertical_flip=True,
+        vertical_flip=True,
         width_shift_range=0.2,
         height_shift_range=0.2,
-        
-    )
-    for i, one_class in enumerate(os.listdir(TRAIN_DATASET_PATH)):
-        train_dataset = train_datagen.flow_from_directory(
-            directory=train_data_path,
-            target_size=(IMG_H, IMG_W),
-            color_mode="rgb",
-            batch_size=BATCH_SIZE,
-            class_mode="sparse",
-            # shuffle=True,
-            seed=42,
-        )
-        
-    validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        # rescale=1./255,
+        validation_split=0.2,
     )
     
-    valid_dataset = validation_datagen.flow_from_directory(
-        directory=val_data_path,
+    train_dataset = train_datagen.flow_from_directory(
+        directory=train_data_path,
         target_size=(IMG_H, IMG_W),
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         # shuffle=True,
-        seed=42
+        seed=42,
+        subset='training'
+    )
+        
+    
+    valid_dataset = train_datagen.flow_from_directory(
+        directory=train_data_path,
+        target_size=(IMG_H, IMG_W),
+        color_mode="rgb",
+        batch_size=BATCH_SIZE,
+        class_mode="sparse",
+        # shuffle=True,
+        seed=42,
+        subset='validation'
     )
     
 #     if COLOUR_MODE == "grayscale":
