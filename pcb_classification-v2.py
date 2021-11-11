@@ -218,6 +218,7 @@ def our_mobilenet(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dense(1024
                                     ,activation = 'relu'
                                    ))
@@ -249,32 +250,34 @@ def build_our_model(i_shape, base_lr, n_class):
         model.add(data_augmentation)
         
     model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer="he_uniform", padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
+    
 
     model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.2))
 
     model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
+    
 
     model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.3))
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
 
     model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.MaxPooling2D())
     model.add(tf.keras.layers.Dropout(0.4))
     
@@ -283,8 +286,8 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.Dense(128,
                                     kernel_initializer="he_uniform",
                                     activity_regularizer=tf.keras.regularizers.l2(0.01)))
-    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(n_class, activation="tanh"))
     
@@ -312,6 +315,7 @@ def our_resnet50(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.AveragePooling2D())
     model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dense(256
                                     ,activation = 'relu'
                                     # ,kernel_regularizer=tf.keras.regularizers.l2(0.01)
