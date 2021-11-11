@@ -69,7 +69,7 @@ TRAIN_MODE = True
 Custom Layer
 """
 data_augmentation = tf.keras.Sequential([
-    tf.keras.layers.RandomFlip("horizontal_and_vertical", input_shape=(IMG_H, IMG_W, IMG_C)),
+    # tf.keras.layers.RandomFlip("horizontal_and_vertical", input_shape=(IMG_H, IMG_W, IMG_C)),
     tf.keras.layers.RandomContrast(0.1),
     # tf.keras.layers.GaussianNoise(0.1),
 ])
@@ -328,18 +328,22 @@ class ResnetBlock(tf.keras.models.Model):
         res = inputs
 
         x = self.conv_1(inputs)
+        x = tf.keras.layers.LeakyReLU()(x)
         x = self.bn_1(x)
-        x = tf.nn.relu(x)
         x = self.conv_2(x)
+        x = tf.keras.layers.LeakyReLU()(x)
         x = self.bn_2(x)
+        
 
         if self.__down_sample:
             res = self.res_conv(res)
+            res = tf.keras.layers.LeakyReLU()(res)
             res = self.res_bn(res)
+            
 
         # if not perform down sample, then add a shortcut directly
         x = self.merge([x, res])
-        out = tf.nn.relu(x)
+        out = tf.keras.layers.LeakyReLU()(x)
         return out
 
 
@@ -364,17 +368,22 @@ class ResNet18(tf.keras.models.Model):
         self.res_4_2 = ResnetBlock(512)
         self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
         self.flat = tf.keras.layers.Flatten()
+        self.lkrl = tf.keras.layers.LeakyReLU()
+        self.do = tf.keras.layers.Dropout(0.5)
         self.fc = tf.keras.layers.Dense(num_classes, activation="softmax")
 
     def call(self, inputs):
         out = self.conv_1(inputs)
         out = self.init_bn(out)
-        out = tf.nn.relu(out)
+        out = tf.keras.layers.LeakyReLU()(out)
         out = self.pool_2(out)
         for res_block in [self.res_1_1, self.res_1_2, self.res_2_1, self.res_2_2, self.res_3_1, self.res_3_2, self.res_4_1, self.res_4_2]:
             out = res_block(out)
+        
         out = self.avg_pool(out)
         out = self.flat(out)
+        out = self.lkrl(out)
+        out = self.do(out)
         out = self.fc(out)
         return out
 
@@ -392,15 +401,15 @@ def our_resnet18(i_shape, base_lr, n_class):
         model.add(data_augmentation)
         
     model.add(resnet)
-    model.add(tf.keras.layers.Dense(128,
-                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.Dropout(0.5))
+#     model.add(tf.keras.layers.Dense(128,
+#                                     kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+#     model.add(tf.keras.layers.LeakyReLU())
+#     model.add(tf.keras.layers.Dropout(0.5))
     
     
-    model.add(tf.keras.layers.Dense(n_class
-                                    ,activation="softmax"
-                                   ))
+#     model.add(tf.keras.layers.Dense(n_class
+#                                     ,activation="softmax"
+#                                    ))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -541,9 +550,10 @@ def dataset_manipulation(train_data_path, val_data_path):
 
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         # rotation_range=20,
-        rescale=1./255,
-        shear_range=0.1,
-        zoom_range=0.15,
+        # rescale=1./255,
+        # shear_range=0.1,
+        # zoom_range=0.15,
+        brightness_range=[1.0,1.5],
         horizontal_flip=True,
         # vertical_flip=True,
         width_shift_range=0.2,
@@ -562,7 +572,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         )
         
     validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        rescale=1./255,
+        # rescale=1./255,
     )
     
     valid_dataset = validation_datagen.flow_from_directory(
@@ -575,53 +585,53 @@ def dataset_manipulation(train_data_path, val_data_path):
         seed=42
     )
     
-    if COLOUR_MODE == "grayscale":
+#     if COLOUR_MODE == "grayscale":
     
-        f_train_dataset = tf.data.Dataset.from_generator(
-            lambda: train_dataset,
-            output_types = (tf.float32, tf.int64),
-            output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
-        )
-        f_valid_dataset = tf.data.Dataset.from_generator(
-            lambda: valid_dataset,
-            output_types = (tf.float32, tf.int64),
-            output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
-        )
+#         f_train_dataset = tf.data.Dataset.from_generator(
+#             lambda: train_dataset,
+#             output_types = (tf.float32, tf.int64),
+#             output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
+#         )
+#         f_valid_dataset = tf.data.Dataset.from_generator(
+#             lambda: valid_dataset,
+#             output_types = (tf.float32, tf.int64),
+#             output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
+#         )
         
-        # plt.figure(figsize=(10, 10))
-        # for images, labels in f_valid_dataset.take(1):
-        #     for i in range(9):
-        #         ax = plt.subplot(3, 3,i+1)
-        #         plt.imshow(images[i].numpy().astype("uint8"))
-        #         plt.title(CLASS_NAME[labels[i]])
-        #         plt.axis("off")
+#         # plt.figure(figsize=(10, 10))
+#         # for images, labels in f_valid_dataset.take(1):
+#         #     for i in range(9):
+#         #         ax = plt.subplot(3, 3,i+1)
+#         #         plt.imshow(images[i].numpy().astype("uint8"))
+#         #         plt.title(CLASS_NAME[labels[i]])
+#         #         plt.axis("off")
         
-        train_ds = (
-            f_train_dataset
-            # .shuffle(1000)
-            .map(prep_image, num_parallel_calls=AUTOTUNE)
-            # .batch(BATCH_SIZE)
-            .prefetch(AUTOTUNE)
-        )
+#         train_ds = (
+#             f_train_dataset
+#             # .shuffle(1000)
+#             .map(prep_image, num_parallel_calls=AUTOTUNE)
+#             # .batch(BATCH_SIZE)
+#             .prefetch(AUTOTUNE)
+#         )
         
-        valid_ds = (
-            f_valid_dataset
-            # .shuffle(1000)
-            .map(prep_image, num_parallel_calls=AUTOTUNE)
-            # .batch(BATCH_SIZE)
-            .prefetch(AUTOTUNE)
-        )
+#         valid_ds = (
+#             f_valid_dataset
+#             # .shuffle(1000)
+#             .map(prep_image, num_parallel_calls=AUTOTUNE)
+#             # .batch(BATCH_SIZE)
+#             .prefetch(AUTOTUNE)
+#         )
 
         
-        # plt.figure(figsize=(10, 10))
-        # for images, labels in valid_ds.take(1):
-        #     for i in range(9):
-        #         ax = plt.subplot(3, 3,i+1)
-        #         plt.imshow(images[i].numpy().astype("uint8"))
-        #         plt.title(CLASS_NAME[labels[i]])
-        #         plt.axis("off")
+#         # plt.figure(figsize=(10, 10))
+#         # for images, labels in valid_ds.take(1):
+#         #     for i in range(9):
+#         #         ax = plt.subplot(3, 3,i+1)
+#         #         plt.imshow(images[i].numpy().astype("uint8"))
+#         #         plt.title(CLASS_NAME[labels[i]])
+#         #         plt.axis("off")
                 
-        return train_ds, valid_ds
+#         return train_ds, valid_ds
     
     
     return train_dataset, valid_dataset
@@ -760,10 +770,4 @@ if __name__ == "__main__":
         our_model = our_resnet18(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
-
-
-# In[ ]:
-
-
-
 
