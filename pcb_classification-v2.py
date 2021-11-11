@@ -38,7 +38,7 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 50
+NUM_EPOCHS = 2
 CHOOSEN_MODEL = 3 # 1 == our model, 2 == mobilenet, 3 == resnet18
 IMG_H = 110
 IMG_W = 42
@@ -47,8 +47,8 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final/training_dataset/"
-TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_ori/test_training_dataset/"
+TEST_DATASET_PATH = "image_dataset_ori/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
@@ -291,130 +291,62 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-class ResnetBlock(tf.keras.models.Model):
-    """
-    A standard resnet block.
-    """
+def relu_bn(inputs: tf.Tensor) -> tf.Tensor:
+    relu = tf.keras.layers.ReLU()(inputs)
+    bn = tf.keras.layers.BatchNormalization()(relu)
+    return bn
 
-    def __init__(self, channels: int, down_sample=False):
-        """
-        channels: same as number of convolution kernels
-        """
-        super().__init__()
+def residual_block(x: tf.Tensor, downsample: bool, filters: int, kernel_size: int = 3) -> tf.Tensor:
+    y = tf.keras.layers.Conv2D(kernel_size=kernel_size,
+               strides= (1 if not downsample else 2),
+               filters=filters,
+               padding="same")(x)
+    y = relu_bn(y)
+    y = tf.keras.layers.Conv2D(kernel_size=kernel_size,
+               strides=1,
+               filters=filters,
+               padding="same")(y)
 
-        self.__channels = channels
-        self.__down_sample = down_sample
-        self.__strides = [2, 1] if down_sample else [1, 1]
+    if downsample:
+        x = tf.keras.layers.Conv2D(kernel_size=1,
+                   strides=2,
+                   filters=filters,
+                   padding="same")(x)
+    out = tf.keras.layers.Add()([x, y])
+    out = relu_bn(out)
+    return out
 
-        KERNEL_SIZE = (3, 3)
-        # use He initialization, instead of Xavier (a.k.a 'glorot_uniform' in Keras), as suggested in [2]
-        INIT_SCHEME = "he_normal"
-
-        self.conv_1 = tf.keras.layers.Conv2D(self.__channels, strides=self.__strides[0],
-                             kernel_size=KERNEL_SIZE, padding="same", kernel_initializer=INIT_SCHEME)
-        self.bn_1 = tf.keras.layers.BatchNormalization()
-        self.conv_2 = tf.keras.layers.Conv2D(self.__channels, strides=self.__strides[1],
-                             kernel_size=KERNEL_SIZE, padding="same", kernel_initializer=INIT_SCHEME)
-        self.bn_2 = tf.keras.layers.BatchNormalization()
-        self.merge = tf.keras.layers.Add()
-
-        if self.__down_sample:
-            # perform down sampling using stride of 2, according to [1].
-            self.res_conv = tf.keras.layers.Conv2D(
-                self.__channels, strides=2, kernel_size=(1, 1), kernel_initializer=INIT_SCHEME, padding="same")
-            self.res_bn = tf.keras.layers.BatchNormalization()
-
-    def call(self, inputs):
-        res = inputs
-
-        x = self.conv_1(inputs)
-        x = tf.keras.layers.LeakyReLU()(x)
-        x = self.bn_1(x)
-        x = self.conv_2(x)
-        x = tf.keras.layers.LeakyReLU()(x)
-        x = self.bn_2(x)
-        
-
-        if self.__down_sample:
-            res = self.res_conv(res)
-            res = tf.keras.layers.LeakyReLU()(res)
-            res = self.res_bn(res)
-            
-
-        # if not perform down sample, then add a shortcut directly
-        x = self.merge([x, res])
-        out = tf.keras.layers.LeakyReLU()(x)
-        return out
-
-
-class ResNet18(tf.keras.models.Model):
-
-    def __init__(self, num_classes, **kwargs):
-        """
-            num_classes: number of classes in specific classification task.
-        """
-        super().__init__(**kwargs)
-        self.conv_1 = tf.keras.layers.Conv2D(64, (7, 7), strides=2,
-                             padding="same", kernel_initializer="he_normal")
-        self.init_bn = tf.keras.layers.BatchNormalization()
-        self.pool_2 = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=2, padding="same")
-        self.res_1_1 = ResnetBlock(64)
-        self.res_1_2 = ResnetBlock(64)
-        self.res_2_1 = ResnetBlock(128, down_sample=True)
-        self.res_2_2 = ResnetBlock(128)
-        self.res_3_1 = ResnetBlock(256, down_sample=True)
-        self.res_3_2 = ResnetBlock(256)
-        self.res_4_1 = ResnetBlock(512, down_sample=True)
-        self.res_4_2 = ResnetBlock(512)
-        self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
-        self.flat = tf.keras.layers.Flatten()
-        self.lkrl = tf.keras.layers.LeakyReLU()
-        self.do = tf.keras.layers.Dropout(0.5)
-        self.fc = tf.keras.layers.Dense(num_classes, activation="softmax")
-
-    def call(self, inputs):
-        out = self.conv_1(inputs)
-        out = self.init_bn(out)
-        out = tf.keras.layers.LeakyReLU()(out)
-        out = self.pool_2(out)
-        for res_block in [self.res_1_1, self.res_1_2, self.res_2_1, self.res_2_2, self.res_3_1, self.res_3_2, self.res_4_1, self.res_4_2]:
-            out = res_block(out)
-        
-        out = self.avg_pool(out)
-        out = self.flat(out)
-        out = self.lkrl(out)
-        out = self.do(out)
-        out = self.fc(out)
-        return out
-
-def get_model_resnet18(n_class):
-    resnet = ResNet18(num_classes=n_class)
-    resnet.build(input_shape = (None, IMG_H, IMG_W, IMG_C))
-    return resnet
-
-def our_resnet18(i_shape, base_lr, n_class):
-    model = tf.keras.models.Sequential()
-    resnet = get_model_resnet18(n_class)
+def build_res_net18(i_shape, base_lr, n_class):
     
+    inputs = tf.keras.layers.Input(shape=i_shape)
+    num_filters = 64
     
-    if AUGMENTATION:
-        model.add(data_augmentation)
-        
-    model.add(resnet)
-#     model.add(tf.keras.layers.Dense(128,
-#                                     kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
-#     model.add(tf.keras.layers.LeakyReLU())
-#     model.add(tf.keras.layers.Dropout(0.5))
+    t = tf.keras.layers.BatchNormalization()(inputs)
+    t = tf.keras.layers.Conv2D(kernel_size=3,
+               strides=1,
+               filters=num_filters,
+               padding="same")(t)
+    t = relu_bn(t)
     
+    num_blocks_list = [2, 5, 5, 2]
+    for i in range(len(num_blocks_list)):
+        num_blocks = num_blocks_list[i]
+        for j in range(num_blocks):
+            t = residual_block(t, downsample=(j==0 and i!=0), filters=num_filters)
+        num_filters *= 2
     
-#     model.add(tf.keras.layers.Dense(n_class
-#                                     ,activation="softmax"
-#                                    ))
+    t = tf.keras.layers.AveragePooling2D(4)(t)
+    t = tf.keras.layers.Flatten()(t)
+    outputs = tf.keras.layers.Dense(n_class, activation='softmax')(t)
     
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                  optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
-                  metrics=['accuracy'])
-    
+    model = tf.keras.models.Model(inputs, outputs)
+
+    model.compile(
+        optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+
     return model
 
 
@@ -567,7 +499,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
-        # shuffle=True,
+        shuffle=True,
         seed=42,
         subset='training'
     )
@@ -579,7 +511,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
-        # shuffle=True,
+        shuffle=True,
         seed=42,
         subset='validation'
     )
@@ -669,7 +601,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
             monitor='val_loss', 
             mode='min', 
             verbose=1, 
-            patience=15, 
+            patience=20, 
             restore_best_weights=True
         )
 
@@ -766,7 +698,13 @@ if __name__ == "__main__":
         """
         mobilenet
         """
-        our_model = our_resnet18(input_shape, base_learning_rate, num_classes)
+        our_model = build_res_net18(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+
+
+# In[ ]:
+
+
+
 
