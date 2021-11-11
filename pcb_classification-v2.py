@@ -39,9 +39,9 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 50
-CHOOSEN_MODEL = 2 # 1 == our model, 2 == mobilenet, 3 == resnet50
-IMG_H = 224
-IMG_W = 224
+CHOOSEN_MODEL = 3 # 1 == our model, 2 == mobilenet, 3 == resnet18
+IMG_H = 110
+IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
@@ -163,7 +163,7 @@ class CustomSaver(tf.keras.callbacks.Callback):
             
     def on_train_end(self, logs=None):
         print(self.model_path)
-        self.model.save(self.model_path)
+        self.model.save_weights(self.model_path)
         
         plot_epoch_result(self.epochs_list, self.custom_loss, "Loss", self.name_model, "g")
 
@@ -179,7 +179,7 @@ class CustomSaver(tf.keras.callbacks.Callback):
         self.custom_loss.append(logs["loss"])
 
         if (epoch + 1) % 15 == 0:
-            self.model.save(self.model_path)
+            self.model.save_weights(self.model_path)
             print('saved for epoch',epoch + 1)
 
 
@@ -291,31 +291,118 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def our_resnet50(i_shape, base_lr, n_class):
+class ResnetBlock(tf.keras.models.Model):
+    """
+    A standard resnet block.
+    """
+
+    def __init__(self, channels: int, down_sample=False):
+        """
+        channels: same as number of convolution kernels
+        """
+        super().__init__()
+
+        self.__channels = channels
+        self.__down_sample = down_sample
+        self.__strides = [2, 1] if down_sample else [1, 1]
+
+        KERNEL_SIZE = (3, 3)
+        # use He initialization, instead of Xavier (a.k.a 'glorot_uniform' in Keras), as suggested in [2]
+        INIT_SCHEME = "he_normal"
+
+        self.conv_1 = tf.keras.layers.Conv2D(self.__channels, strides=self.__strides[0],
+                             kernel_size=KERNEL_SIZE, padding="same", kernel_initializer=INIT_SCHEME)
+        self.bn_1 = tf.keras.layers.BatchNormalization()
+        self.conv_2 = tf.keras.layers.Conv2D(self.__channels, strides=self.__strides[1],
+                             kernel_size=KERNEL_SIZE, padding="same", kernel_initializer=INIT_SCHEME)
+        self.bn_2 = tf.keras.layers.BatchNormalization()
+        self.merge = tf.keras.layers.Add()
+
+        if self.__down_sample:
+            # perform down sampling using stride of 2, according to [1].
+            self.res_conv = tf.keras.layers.Conv2D(
+                self.__channels, strides=2, kernel_size=(1, 1), kernel_initializer=INIT_SCHEME, padding="same")
+            self.res_bn = tf.keras.layers.BatchNormalization()
+
+    def call(self, inputs):
+        res = inputs
+
+        x = self.conv_1(inputs)
+        x = self.bn_1(x)
+        x = tf.nn.relu(x)
+        x = self.conv_2(x)
+        x = self.bn_2(x)
+
+        if self.__down_sample:
+            res = self.res_conv(res)
+            res = self.res_bn(res)
+
+        # if not perform down sample, then add a shortcut directly
+        x = self.merge([x, res])
+        out = tf.nn.relu(x)
+        return out
+
+
+class ResNet18(tf.keras.models.Model):
+
+    def __init__(self, num_classes, **kwargs):
+        """
+            num_classes: number of classes in specific classification task.
+        """
+        super().__init__(**kwargs)
+        self.conv_1 = tf.keras.layers.Conv2D(64, (7, 7), strides=2,
+                             padding="same", kernel_initializer="he_normal")
+        self.init_bn = tf.keras.layers.BatchNormalization()
+        self.pool_2 = tf.keras.layers.MaxPool2D(pool_size=(2, 2), strides=2, padding="same")
+        self.res_1_1 = ResnetBlock(64)
+        self.res_1_2 = ResnetBlock(64)
+        self.res_2_1 = ResnetBlock(128, down_sample=True)
+        self.res_2_2 = ResnetBlock(128)
+        self.res_3_1 = ResnetBlock(256, down_sample=True)
+        self.res_3_2 = ResnetBlock(256)
+        self.res_4_1 = ResnetBlock(512, down_sample=True)
+        self.res_4_2 = ResnetBlock(512)
+        self.avg_pool = tf.keras.layers.GlobalAveragePooling2D()
+        self.flat = tf.keras.layers.Flatten()
+        self.fc = tf.keras.layers.Dense(num_classes, activation="softmax")
+
+    def call(self, inputs):
+        out = self.conv_1(inputs)
+        out = self.init_bn(out)
+        out = tf.nn.relu(out)
+        out = self.pool_2(out)
+        for res_block in [self.res_1_1, self.res_1_2, self.res_2_1, self.res_2_2, self.res_3_1, self.res_3_2, self.res_4_1, self.res_4_2]:
+            out = res_block(out)
+        out = self.avg_pool(out)
+        out = self.flat(out)
+        out = self.fc(out)
+        return out
+
+def get_model_resnet18(n_class):
+    resnet = ResNet18(num_classes=n_class)
+    resnet.build(input_shape = (None, IMG_H, IMG_W, IMG_C))
+    return resnet
+
+def our_resnet18(i_shape, base_lr, n_class):
     model = tf.keras.models.Sequential()
+    resnet = get_model_resnet18(n_class)
     
-    base_model = tf.keras.applications.ResNet50(weights=None, input_shape=i_shape, include_top=False)
-    base_model.trainable = True
-        
+    
     if AUGMENTATION:
-        model.add(data_augmentation)    
-    
-    model.add(base_model)
-    
-    
-    model.add(tf.keras.layers.GlobalAveragePooling2D())
-    model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.Dense(512,
+        model.add(data_augmentation)
+        
+    model.add(resnet)
+    model.add(tf.keras.layers.Dense(128,
                                     kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.5))
+    
     
     model.add(tf.keras.layers.Dense(n_class
                                     ,activation="softmax"
                                    ))
     
-    model.compile(loss='sparse_categorical_crossentropy',
+    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -463,15 +550,17 @@ def dataset_manipulation(train_data_path, val_data_path):
         height_shift_range=0.2,
         
     )
-    train_dataset = train_datagen.flow_from_directory(
-        directory=train_data_path,
-        target_size=(IMG_H, IMG_W),
-        color_mode="rgb",
-        batch_size=BATCH_SIZE,
-        class_mode="sparse",
-        # shuffle=True,
-        seed=42,
-    )
+    for i, one_class in enumerate(os.listdir(TRAIN_DATASET_PATH)):
+        train_dataset = train_datagen.flow_from_directory(
+            directory=train_data_path,
+            target_size=(IMG_H, IMG_W),
+            color_mode="rgb",
+            batch_size=BATCH_SIZE,
+            class_mode="sparse",
+            # shuffle=True,
+            seed=42,
+        )
+        
     validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rescale=1./255,
     )
@@ -637,7 +726,7 @@ if __name__ == "__main__":
     elif CHOOSEN_MODEL == 2:
         name_model = name_model + "-mobilenet"
     elif CHOOSEN_MODEL == 3:
-        name_model = name_model + "-resnet50"
+        name_model = name_model + "-resnet18"
         
     print("start: ", name_model)
     base_learning_rate = 0.00001
@@ -650,6 +739,7 @@ if __name__ == "__main__":
     path_model = SAVED_MODEL_PATH + name_model + "_model" + ".h5"
     
     train_dataset, val_dataset = dataset_manipulation(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
+    # generate_image_dataset(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
     
         
     """
@@ -667,7 +757,13 @@ if __name__ == "__main__":
         """
         mobilenet
         """
-        our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
+        our_model = our_resnet18(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+
+
+# In[ ]:
+
+
+
 
