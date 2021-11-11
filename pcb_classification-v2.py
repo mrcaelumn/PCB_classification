@@ -219,15 +219,22 @@ def our_mobilenet(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.BatchNormalization())
+    
     model.add(tf.keras.layers.Dense(1024
                                     ,activation = 'relu'
                                    ))
+    model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(1024
                                     ,activation = 'relu'
                                    ))
+    model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(512
                                     ,activation = 'relu'
                                    ))
+    model.add(tf.keras.layers.Dropout(0.5))
+    
+    
+    
     model.add(tf.keras.layers.Dense(n_class
                                     ,activation="softmax"
                                    ))
