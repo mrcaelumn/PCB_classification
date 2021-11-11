@@ -703,9 +703,3 @@ if __name__ == "__main__":
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
 
-
-# In[ ]:
-
-
-
-
