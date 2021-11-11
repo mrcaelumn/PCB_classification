@@ -59,7 +59,6 @@ CLASS_NAME = ["0","1","2", "3","4", "5", "6", "7"]
 
 AUTOTUNE = tf.data.AUTOTUNE
 AUGMENTATION = False
-AUGMENTATION_REPEAT = True
 
 
 # In[ ]:
@@ -73,24 +72,6 @@ data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomContrast(0.2),
     tf.keras.layers.GaussianNoise(0.1),
 ])
-
-def prep_image(image):
-    """
-    Preparation
-    """
-    if COLOUR_MODE == "grayscale":
-        image = tf.image.rgb_to_grayscale(image)
-        image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
-    
-    if COLOUR_MODE == "grayscale" and IMG_C == 3:
-        image = tf.image.grayscale_to_rgb(image)
-    
-    # image = tf.image.resize(image, (IMG_H, IMG_W))
-    # image = tf.cast(image, tf.float32)
-    # image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
-    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
-    
-    return image
 
 
 # In[ ]:
@@ -222,19 +203,21 @@ def our_mobilenet(i_shape, base_lr, n_class):
     
     model.add(tf.keras.layers.Dense(1024
                                     ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
                                    ))
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(1024
                                     ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
                                    ))
     model.add(tf.keras.layers.Dropout(0.5))
     model.add(tf.keras.layers.Dense(512
                                     ,activation = 'relu'
+                                    ,kernel_regularizer=tf.keras.regularizers.l2(0.0001)
                                    ))
-    model.add(tf.keras.layers.Dropout(0.5))
     
     
-    
+    model.add(tf.keras.layers.Dropout(0.5))    
     model.add(tf.keras.layers.Dense(n_class
                                     ,activation="softmax"
                                    ))
@@ -422,6 +405,25 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 
 
 # @tf.function
+def prep_image(image, label):
+    """
+    Preparation
+    """
+    if COLOUR_MODE == "grayscale":
+        image = tf.image.rgb_to_grayscale(image)
+        # image = tf_clahe.clahe(image, tile_grid_size=(4, 4), clip_limit=4.0) 
+    
+    if COLOUR_MODE == "grayscale" and IMG_C == 3:
+        image = tf.image.grayscale_to_rgb(image)
+    
+    # image = tf.image.resize(image, (IMG_H, IMG_W))
+    # image = tf.cast(image, tf.float32)
+    # image = (image / 255.0)  # rescailing image from 0,255 to 0, 1
+    # img = (img - 127.5) / 127.5 # rescailing image from 0,255 to -1,1
+    
+    return image, label
+
+
 def dataset_manipulation(train_data_path, val_data_path):
     
 
@@ -434,31 +436,42 @@ def dataset_manipulation(train_data_path, val_data_path):
         vertical_flip=True,
         width_shift_range=0.1,
         height_shift_range=0.1,
+        # preprocessing_function=gray_to_rgb
         
     )
     train_dataset = train_datagen.flow_from_directory(
         directory=train_data_path,
         target_size=(IMG_H, IMG_W),
-        color_mode=COLOUR_MODE,
+        color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
-        seed=42
+        seed=42,
     )
     validation_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         rescale=1./255,
+        # preprocessing_function=gray_to_rgb
     )
     
     valid_dataset = validation_datagen.flow_from_directory(
         directory=val_data_path,
         target_size=(IMG_H, IMG_W),
-        color_mode=COLOUR_MODE,
+        color_mode="rgb",
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
         seed=42
     )
     
+#     if COLOUR_MODE == "grayscale":
+    
+#         f_train_dataset = tf.data.Dataset.from_generator(train_dataset)
+#         f_valid_dataset = tf.data.Dataset.from_generator(valid_dataset)
+
+#         f_train_dataset = f_train_dataset.map(prep_image)
+#         f_valid_dataset = f_valid_dataset.map(prep_image)
+        
+#         return f_train_dataset, f_valid_dataset
     
     
     return train_dataset, valid_dataset
@@ -593,10 +606,4 @@ if __name__ == "__main__":
         our_model = our_resnet50(input_shape, base_learning_rate, num_classes)
         # our_model.summary()
         __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
-
-
-# In[ ]:
-
-
-
 
