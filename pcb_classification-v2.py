@@ -485,7 +485,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         # rescale=1./255,
         # shear_range=0.1,
         # zoom_range=0.15,
-        brightness_range=[0.9, 1.5],
+        brightness_range=[1.1, 1.4],
         horizontal_flip=True,
         vertical_flip=True,
         width_shift_range=0.2,
@@ -517,53 +517,6 @@ def dataset_manipulation(train_data_path, val_data_path):
         # subset='validation'
     )
     
-#     if COLOUR_MODE == "grayscale":
-    
-#         f_train_dataset = tf.data.Dataset.from_generator(
-#             lambda: train_dataset,
-#             output_types = (tf.float32, tf.int64),
-#             output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
-#         )
-#         f_valid_dataset = tf.data.Dataset.from_generator(
-#             lambda: valid_dataset,
-#             output_types = (tf.float32, tf.int64),
-#             output_shapes = ([None, IMG_H, IMG_H, IMG_C], [None,]),
-#         )
-        
-#         # plt.figure(figsize=(10, 10))
-#         # for images, labels in f_valid_dataset.take(1):
-#         #     for i in range(9):
-#         #         ax = plt.subplot(3, 3,i+1)
-#         #         plt.imshow(images[i].numpy().astype("uint8"))
-#         #         plt.title(CLASS_NAME[labels[i]])
-#         #         plt.axis("off")
-        
-#         train_ds = (
-#             f_train_dataset
-#             # .shuffle(1000)
-#             .map(prep_image, num_parallel_calls=AUTOTUNE)
-#             # .batch(BATCH_SIZE)
-#             .prefetch(AUTOTUNE)
-#         )
-        
-#         valid_ds = (
-#             f_valid_dataset
-#             # .shuffle(1000)
-#             .map(prep_image, num_parallel_calls=AUTOTUNE)
-#             # .batch(BATCH_SIZE)
-#             .prefetch(AUTOTUNE)
-#         )
-
-        
-#         # plt.figure(figsize=(10, 10))
-#         # for images, labels in valid_ds.take(1):
-#         #     for i in range(9):
-#         #         ax = plt.subplot(3, 3,i+1)
-#         #         plt.imshow(images[i].numpy().astype("uint8"))
-#         #         plt.title(CLASS_NAME[labels[i]])
-#         #         plt.axis("off")
-                
-#         return train_ds, valid_ds
     
     
     return train_dataset, valid_dataset
@@ -619,7 +572,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
             # class_weight=train_class_weights,
             callbacks=[
                 saver_callback,
-                es
+                # es
                 # lr_scheduler
             ]   
         )
