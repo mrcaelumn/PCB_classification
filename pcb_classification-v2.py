@@ -39,7 +39,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 100
-CHOOSEN_MODEL = 3 # 1 == our model, 2 == mobilenet, 3 == resnet18
+CHOOSEN_MODEL = 3 # 1 == nasnet, 2 == mobilenet, 3 == resnet18
 IMG_H = 110
 IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
@@ -233,55 +233,19 @@ def our_mobilenet(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def build_our_model(i_shape, base_lr, n_class):
+def build_nasnet(i_shape, base_lr, n_class):
     
     model = tf.keras.models.Sequential()
     
-    if AUGMENTATION:
-        model.add(data_augmentation)
+    base_model = tf.keras.applications.NASNetMobile(weights="imagenet", input_shape=i_shape, include_top=False, classes=n_class)
+    base_model.trainable = False
         
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer="he_uniform", padding='same', input_shape=(IMG_H, IMG_W, IMG_C)))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
+    if AUGMENTATION:
+        model.add(data_augmentation)    
     
-
-    model.add(tf.keras.layers.Conv2D(32, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D())
-    model.add(tf.keras.layers.Dropout(0.2))
-
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
+    model.add(base_model)
     
-
-    model.add(tf.keras.layers.Conv2D(64, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D())
-    model.add(tf.keras.layers.Dropout(0.3))
-
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
-
-    model.add(tf.keras.layers.Conv2D(128, (3, 3), kernel_initializer="he_uniform", padding='same'))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.MaxPooling2D())
-    model.add(tf.keras.layers.Dropout(0.4))
-    
-    model.add(tf.keras.layers.Flatten())
-
-    model.add(tf.keras.layers.Dense(512,
-                                    kernel_initializer="he_uniform"))
-    model.add(tf.keras.layers.BatchNormalization())
-    model.add(tf.keras.layers.LeakyReLU())
-    model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
-    
-    model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
     
@@ -337,6 +301,8 @@ def build_res_net18(i_shape, base_lr, n_class):
     
     t = tf.keras.layers.AveragePooling2D(4)(t)
     t = tf.keras.layers.Flatten()(t)
+    t = tf.keras.layers.ReLU()(t)
+    t = tf.keras.layers.Dropout(0.5)(t)
     outputs = tf.keras.layers.Dense(n_class, activation='softmax')(t)
     
     model = tf.keras.models.Model(inputs, outputs)
@@ -482,10 +448,10 @@ def dataset_manipulation(train_data_path, val_data_path):
 
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         # rotation_range=20,
-        # rescale=1./255,
-        # shear_range=0.1,
-        # zoom_range=0.15,
-        brightness_range=[1.1, 1.4],
+        rescale=1./255,
+        shear_range=0.1,
+        zoom_range=0.15,
+        brightness_range=[0.9, 1.4],
         horizontal_flip=True,
         vertical_flip=True,
         width_shift_range=0.2,
@@ -504,7 +470,9 @@ def dataset_manipulation(train_data_path, val_data_path):
         # subset='training'
     )
         
-    valid_datagen = tf.keras.preprocessing.image.ImageDataGenerator()
+    valid_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
+        rescale=1./255,
+    )
         
     valid_dataset = valid_datagen.flow_from_directory(
         directory=val_data_path,
@@ -617,7 +585,7 @@ if __name__ == "__main__":
     
     name_model = str(IMG_H)+"_pcb_"+str(NUM_EPOCHS)
     if CHOOSEN_MODEL == 1:
-        name_model = name_model + "-custom_model"
+        name_model = name_model + "-nasnet"
     elif CHOOSEN_MODEL == 2:
         name_model = name_model + "-mobilenet"
     elif CHOOSEN_MODEL == 3:
@@ -640,7 +608,7 @@ if __name__ == "__main__":
     """
     our custom model
     """ 
-    our_model = build_our_model(input_shape, base_learning_rate, num_classes)
+    our_model = build_nasnet(input_shape, base_learning_rate, num_classes)
     # our_model.summary()
         
     if CHOOSEN_MODEL == 2:
