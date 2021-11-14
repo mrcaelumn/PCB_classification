@@ -38,7 +38,7 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 100
+NUM_EPOCHS = 2
 CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == mobilenet, 3 == nasnet
 IMG_H = 110
 IMG_W = 42
@@ -47,7 +47,7 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final_grayscale/training_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final_grayscale/test_training_dataset/"
 TEST_DATASET_PATH = "image_dataset_final_grayscale/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
@@ -535,7 +535,7 @@ def get_callbacks(path_model, name_model):
             name_model
         )
         
-    checkpoint_filepath = SAVED_MODEL_PATH + name_model + '_weights.{epoch:02d}-{val_loss:.2f}.h5'
+    checkpoint_filepath = SAVED_MODEL_PATH + name_model + '_weights.{epoch:02d}-{val_accuracy:.2f}.h5'
 
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
