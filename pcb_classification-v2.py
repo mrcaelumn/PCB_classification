@@ -38,17 +38,17 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 2
-CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == mobilenet, 3 == nasnet
-IMG_H = 224
-IMG_W = 224
+NUM_EPOCHS = 100
+CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == mobilenet, 3 == nasnet
+IMG_H = 110
+IMG_W = 42
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final/test_training_dataset/"
-TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final_grayscale/training_dataset/"
+TEST_DATASET_PATH = "image_dataset_final_grayscale/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
@@ -455,6 +455,22 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
 # In[ ]:
 
 
+def color_jitter(image, brightness=25, contrast=0.2, saturation=0.2, hue=0.1):
+    """Distort the color of the image."""
+    if brightness > 0:
+        image = tf.image.random_brightness(image, max_delta=brightness)
+    if contrast > 0:
+        image = tf.image.random_contrast(image, lower=1-contrast, upper=1+contrast)
+    if saturation > 0:
+        image = tf.image.random_saturation(image, lower=1-saturation, upper=1+saturation)
+    if hue > 0:
+        image = tf.image.random_hue(image, max_delta=hue)
+    return image 
+
+def random_color_jitter(image):
+    image = color_jitter(image)
+    return image
+
 def dataset_manipulation(train_data_path, val_data_path):
     
 
@@ -467,7 +483,9 @@ def dataset_manipulation(train_data_path, val_data_path):
         horizontal_flip=True,
         vertical_flip=True,
         width_shift_range=0.2,
+        zca_whitening=True,
         height_shift_range=0.2,
+        # preprocessing_function=random_color_jitter,
         # validation_split=0.2,
     )
     
