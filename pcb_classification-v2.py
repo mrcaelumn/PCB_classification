@@ -39,9 +39,9 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 100
-CHOOSEN_MODEL = 3 # 1 == nasnet, 2 == mobilenet, 3 == resnet18
-IMG_H = 110
-IMG_W = 42
+CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == mobilenet, 3 == nasnet
+IMG_H = 224
+IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
@@ -237,14 +237,26 @@ def build_nasnet(i_shape, base_lr, n_class):
     
     model = tf.keras.models.Sequential()
     
-    base_model = tf.keras.applications.NASNetMobile(weights="imagenet", input_shape=i_shape, include_top=False, classes=n_class)
+    base_model = tf.keras.applications.NASNetMobile(weights="imagenet", input_shape=i_shape, include_top=False)
     base_model.trainable = False
         
     if AUGMENTATION:
         model.add(data_augmentation)    
     
     model.add(base_model)
+    model.add(tf.keras.layers.GlobalAveragePooling2D())
+    model.add(tf.keras.layers.Flatten())
+    model.add(tf.keras.layers.BatchNormalization())
     
+    model.add(tf.keras.layers.Dense(512,
+                                    kernel_regularizer=tf.keras.regularizers.l2(0.0001)))
+    model.add(tf.keras.layers.LeakyReLU())
+    model.add(tf.keras.layers.Dropout(0.5))
+    
+    
+    model.add(tf.keras.layers.Dense(n_class
+                                    ,activation="softmax"
+                                   ))
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
@@ -382,7 +394,7 @@ def evaluate_and_testing(this_model, p_model, test_dataset_path, c_names):
         #         plt.title(CLASS_NAME[labels[i]])
         #         plt.axis("off")
     
-    print("Evaluate")
+    print("=======Evaluating=======")
     result = this_model.evaluate(test_dataset)
     print(result)
     dict(zip(this_model.metrics_names, result))
@@ -585,11 +597,11 @@ if __name__ == "__main__":
     
     name_model = str(IMG_H)+"_pcb_"+str(NUM_EPOCHS)
     if CHOOSEN_MODEL == 1:
-        name_model = name_model + "-nasnet"
+        name_model = name_model + "-resnet18"
     elif CHOOSEN_MODEL == 2:
         name_model = name_model + "-mobilenet"
     elif CHOOSEN_MODEL == 3:
-        name_model = name_model + "-resnet18"
+        name_model = name_model + "-nasnet"
         
     print("start: ", name_model)
     base_learning_rate = 0.00001
@@ -604,23 +616,14 @@ if __name__ == "__main__":
     train_dataset, val_dataset = dataset_manipulation(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
     # generate_image_dataset(TRAIN_DATASET_PATH, TEST_DATASET_PATH)
     
-        
-    """
-    our custom model
-    """ 
-    our_model = build_nasnet(input_shape, base_learning_rate, num_classes)
+    our_model = build_res_net18(input_shape, base_learning_rate, num_classes)
+    
     # our_model.summary()
         
     if CHOOSEN_MODEL == 2:
-        """
-        mobilenet
-        """
         our_model = our_mobilenet(input_shape, base_learning_rate, num_classes)
     elif CHOOSEN_MODEL == 3:
-        """
-        mobilenet
-        """
-        our_model = build_res_net18(input_shape, base_learning_rate, num_classes)
+        our_model = build_nasnet(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
 
