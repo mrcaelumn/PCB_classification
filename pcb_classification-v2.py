@@ -38,7 +38,7 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 100
+NUM_EPOCHS = 2
 CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == mobilenet, 3 == nasnet
 IMG_H = 224
 IMG_W = 224
@@ -47,7 +47,7 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final/training_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final/test_training_dataset/"
 TEST_DATASET_PATH = "image_dataset_final/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
@@ -511,6 +511,43 @@ def exponential_decay(lr0, s):
     return exponential_decay_fn
 
 
+def get_callbacks(path_model, name_model):
+    saver_callback = CustomSaver(
+            path_model,
+            name_model
+        )
+        
+    checkpoint_filepath = SAVED_MODEL_PATH + name_model + '_weights.{epoch:02d}-{val_loss:.2f}.h5'
+
+    model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath,
+        monitor='val_accuracy',
+        mode='max',
+        save_best_only=True)
+
+    early_callback = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss', 
+        mode='min', 
+        verbose=1, 
+        patience=20, 
+        restore_best_weights=True
+    )
+
+
+    exponential_decay_fn = exponential_decay(0.01, 20)
+    lr_scheduler_callback = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
+    
+    return [
+        saver_callback,
+        # early_callback,
+        # lr_scheduler_callback,
+        model_checkpoint_callback,
+    ]
+
+
+# In[ ]:
+
+
 def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
     print("running", name_model)
 #     y = np.concatenate([y for x, y in train_dataset], axis=0)
@@ -526,23 +563,8 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
 #     print("class_weights: ", train_class_weights)
 
     if TRAIN_MODE:
-        saver_callback = CustomSaver(
-            path_model,
-            name_model
-        )
-
-        es = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss', 
-            mode='min', 
-            verbose=1, 
-            patience=20, 
-            restore_best_weights=True
-        )
-
-
-        exponential_decay_fn = exponential_decay(0.01, 20)
-        lr_scheduler = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
-
+        
+        callbacks_func = get_callbacks(path_model, name_model)
 
         fit_history_our_model = our_model.fit(
             train_dataset,
@@ -550,11 +572,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
             validation_data=val_dataset,
             batch_size=BATCH_SIZE,
             # class_weight=train_class_weights,
-            callbacks=[
-                saver_callback,
-                # es
-                # lr_scheduler
-            ]   
+            callbacks=callbacks_func,
         )
 
         acc = fit_history_our_model.history['accuracy']
