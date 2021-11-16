@@ -247,19 +247,19 @@ def build_nasnet(i_shape, base_lr, n_class):
     base_model = tf.keras.applications.NASNetMobile(weights="imagenet", input_shape=i_shape, include_top=False)
     base_model.trainable = False
         
+    bn = tf.keras.layers.BatchNormalization()(inputs)
+    x = base_model(bn)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dense(1024, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
     
-    x = base_model(inputs)
-    out1 = tf.keras.layers.GlobalMaxPooling2D()(x)
-    out2 = tf.keras.layers.GlobalAveragePooling2D()(x)
-    out3 = tf.keras.layers.Flatten()(x)
-    out = tf.keras.layers.Concatenate(axis=-1)([out1, out2, out3])
-    out = tf.keras.layers.Dropout(0.5)(out)
-    out =tf.keras.layers.Dense(n_class, activation="softmax")(out)
+    out =tf.keras.layers.Dense(n_class, activation="softmax")(x)
     
     model = tf.keras.models.Model(inputs, out)
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
+    
     model.summary()
     return model
 
