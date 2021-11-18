@@ -44,7 +44,7 @@ IMG_H = 224
 IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 
 # set dir of files
 TRAIN_DATASET_PATH = "image_dataset_final_grayscale/test_training_dataset/"
@@ -477,14 +477,14 @@ def dataset_manipulation(train_data_path, val_data_path):
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         # rotation_range=20,
         rescale=1./255,
-        # shear_range=0.1,
-        # zoom_range=0.15,
+        shear_range=0.1,
+        zoom_range=0.1,
         brightness_range=[0.9, 1.4],
         horizontal_flip=True,
         vertical_flip=True,
-        # width_shift_range=0.2,
+        width_shift_range=0.1,
         zca_whitening=True,
-        # height_shift_range=0.2,
+        height_shift_range=0.1,
         # preprocessing_function=random_color_jitter,
         # validation_split=0.2,
     )
@@ -523,12 +523,6 @@ def dataset_manipulation(train_data_path, val_data_path):
 # In[ ]:
 
 
-def exponential_decay(lr0, s):
-    def exponential_decay_fn(epoch):
-        return lr0 * 0.1 **(epoch / s)
-    return exponential_decay_fn
-
-
 def get_callbacks(path_model, name_model):
     saver_callback = CustomSaver(
             path_model,
@@ -536,7 +530,10 @@ def get_callbacks(path_model, name_model):
         )
         
     checkpoint_filepath = SAVED_MODEL_PATH + name_model + '_weights.{epoch:02d}-{val_accuracy:.2f}.h5'
-
+    
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                              patience=7, min_lr=0.000001)
+    
     model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_filepath,
         monitor='val_accuracy',
@@ -551,14 +548,11 @@ def get_callbacks(path_model, name_model):
         restore_best_weights=True
     )
 
-
-    exponential_decay_fn = exponential_decay(0.01, 20)
-    lr_scheduler_callback = tf.keras.callbacks.LearningRateScheduler(exponential_decay_fn)
     
     return [
         saver_callback,
         # early_callback,
-        # lr_scheduler_callback,
+        reduce_lr,
         model_checkpoint_callback,
     ]
 
@@ -640,7 +634,7 @@ if __name__ == "__main__":
         name_model = name_model + "-nasnet"
         
     print("start: ", name_model)
-    base_learning_rate = 0.00001
+    base_learning_rate = 0.0001
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
