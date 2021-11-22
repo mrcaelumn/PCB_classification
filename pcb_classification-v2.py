@@ -38,8 +38,8 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 150
-CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == custom_our_model, 3 == nasnet
+NUM_EPOCHS = 2
+CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
 IMG_H = 224
 IMG_W = 224
 IMG_C = 3  ## Change this to 1 for grayscale.
@@ -241,10 +241,10 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def build_nasnet(i_shape, base_lr, n_class):
+def build_densenet(i_shape, base_lr, n_class):
     inputs = tf.keras.layers.Input(i_shape)
     
-    base_model = tf.keras.applications.NASNetMobile(weights="imagenet", input_shape=i_shape, include_top=False)
+    base_model = tf.keras.applications.densenet.DenseNet121(weights="imagenet", input_shape=i_shape, include_top=False)
     base_model.trainable = False
         
     bn = tf.keras.layers.BatchNormalization()(inputs)
@@ -311,7 +311,7 @@ def build_resnet18(i_shape, base_lr, n_class):
             t = residual_block(t, downsample=(j==0 and i!=0), filters=num_filters)
         num_filters *= 2
     
-    t = tf.keras.layers.AveragePooling2D(4)(t)
+    t = tf.keras.layers.GlobalAveragePooling2D()(t)
     t = tf.keras.layers.Flatten()(t)
     t = tf.keras.layers.ReLU()(t)
     t = tf.keras.layers.Dropout(0.5)(t)
@@ -479,7 +479,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         rescale=1./255,
         shear_range=0.1,
         zoom_range=0.1,
-        brightness_range=[0.9, 1.4],
+        brightness_range=[1.1, 1.9],
         horizontal_flip=True,
         vertical_flip=True,
         width_shift_range=0.1,
@@ -631,10 +631,10 @@ if __name__ == "__main__":
     elif CHOOSEN_MODEL == 2:
         name_model = name_model + "-custom_our_model"
     elif CHOOSEN_MODEL == 3:
-        name_model = name_model + "-nasnet"
+        name_model = name_model + "-densenet"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0001
+    base_learning_rate = 0.0002
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -653,7 +653,7 @@ if __name__ == "__main__":
     if CHOOSEN_MODEL == 2:
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
     elif CHOOSEN_MODEL == 3:
-        our_model = build_nasnet(input_shape, base_learning_rate, num_classes)
+        our_model = build_densenet(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
 
