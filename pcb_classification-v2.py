@@ -40,8 +40,8 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2,     "This notebook requires TensorFlow 2.0 or above."
 
 """ Set Hyper parameters """
-NUM_EPOCHS = 2
-CHOOSEN_MODEL = 2 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
+NUM_EPOCHS = 150
+CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
 IMG_H = 42
 IMG_W = 110
 IMG_C = 3  ## Change this to 1 for grayscale.
@@ -49,8 +49,8 @@ COLOUR_MODE = "rgb"
 BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final_grayscale/test_training_dataset/"
-TEST_DATASET_PATH = "image_dataset_final_grayscale/evaluation_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final_grayscale_clahe/training_dataset/"
+TEST_DATASET_PATH = "image_dataset_final_grayscale_clahe/clahe_evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
 FORMAT_IMAGE = [".jpg",".png",".jpeg", ".bmp"]
@@ -313,7 +313,7 @@ def build_resnet18(i_shape, base_lr, n_class):
             t = residual_block(t, downsample=(j==0 and i!=0), filters=num_filters)
         num_filters *= 2
     
-    t = tf.keras.layers.AveragePooling2D(4)(t)
+    t = tf.keras.layers.MaxPooling2D()(t)
     t = tf.keras.layers.Flatten()(t)
     t = tf.keras.layers.ReLU()(t)
     t = tf.keras.layers.Dropout(0.5)(t)
