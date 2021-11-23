@@ -13,6 +13,7 @@
 # !pip install tensorflow_io
 # !pip install tensorflow_addons
 # !pip install tf_clahe
+# !pip install git+https://github.com/qubvel/classification_models.git
 
 
 # In[ ]:
@@ -31,6 +32,7 @@ import tf_clahe
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.utils import class_weight
+import math
 from packaging import version
 from matplotlib import pyplot as plt
 
@@ -39,15 +41,15 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 2
-CHOOSEN_MODEL = 3 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
-IMG_H = 224
-IMG_W = 224
+CHOOSEN_MODEL = 2 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
+IMG_H = 42
+IMG_W = 110
 IMG_C = 3  ## Change this to 1 for grayscale.
 COLOUR_MODE = "rgb"
-BATCH_SIZE = 256
+BATCH_SIZE = 32
 
 # set dir of files
-TRAIN_DATASET_PATH = "image_dataset_final_grayscale/training_dataset/"
+TRAIN_DATASET_PATH = "image_dataset_final_grayscale/test_training_dataset/"
 TEST_DATASET_PATH = "image_dataset_final_grayscale/evaluation_dataset/"
 SAVED_MODEL_PATH = "saved_model/"
     
@@ -229,7 +231,7 @@ def build_our_model(i_shape, base_lr, n_class):
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.BatchNormalization())
     model.add(tf.keras.layers.Dropout(0.5))
-    model.add(tf.keras.layers.Dense(n_class, activation="sotfmax"))
+    model.add(tf.keras.layers.Dense(n_class, activation="softmax"))
     
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
@@ -311,7 +313,7 @@ def build_resnet18(i_shape, base_lr, n_class):
             t = residual_block(t, downsample=(j==0 and i!=0), filters=num_filters)
         num_filters *= 2
     
-    t = tf.keras.layers.GlobalAveragePooling2D()(t)
+    t = tf.keras.layers.AveragePooling2D(4)(t)
     t = tf.keras.layers.Flatten()(t)
     t = tf.keras.layers.ReLU()(t)
     t = tf.keras.layers.Dropout(0.5)(t)
@@ -477,8 +479,8 @@ def dataset_manipulation(train_data_path, val_data_path):
     train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
         # rotation_range=20,
         rescale=1./255,
-        shear_range=0.1,
-        zoom_range=0.1,
+        # shear_range=0.1,
+        # zoom_range=0.1,
         brightness_range=[1.1, 1.9],
         horizontal_flip=True,
         vertical_flip=True,
@@ -496,7 +498,7 @@ def dataset_manipulation(train_data_path, val_data_path):
         batch_size=BATCH_SIZE,
         class_mode="sparse",
         shuffle=True,
-        seed=123,
+        seed=32,
         # subset='training'
     )
         
@@ -560,22 +562,34 @@ def get_callbacks(path_model, name_model):
 # In[ ]:
 
 
+def create_class_weight(labels_dict,mu=0.15):
+    total = np.sum(list(labels_dict.values()))
+    keys = labels_dict.keys()
+    class_weight = dict()
+    
+    for key in keys:
+        score = math.log(mu*total/float(labels_dict[key]))
+        class_weight[key] = score
+    
+    return class_weight
+
 def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_model, class_name):
     print("running", name_model)
-#     y = np.concatenate([y for x, y in train_dataset], axis=0)
-#     print(dict(zip(*np.unique(y, return_counts=True))))
-#     class_weights = class_weight.compute_class_weight(
-#         class_weight='balanced',
-#         classes=np.unique(y), 
-#         y=y
-#     )
-    
-#     train_class_weights = dict(enumerate(class_weights))
-    
-#     print("class_weights: ", train_class_weights)
 
     if TRAIN_MODE:
-        
+        amountofimages = {
+            0: 7182,
+            1: 3508,
+            2: 3360,
+            3: 3344,
+            4: 3648,
+            5: 3186,
+            6: 3277,
+            7: 3264
+        }
+        train_class_weights = create_class_weight(amountofimages)
+        print(train_class_weights)
+        train_class_weights = dict(enumerate(train_class_weights))
         callbacks_func = get_callbacks(path_model, name_model)
 
         fit_history_our_model = our_model.fit(
@@ -583,7 +597,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
             epochs=num_epochs,
             validation_data=val_dataset,
             batch_size=BATCH_SIZE,
-            # class_weight=train_class_weights,
+            class_weight=train_class_weights,
             callbacks=callbacks_func,
         )
 
@@ -611,6 +625,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
         plt.savefig(name_model+'_trainning_result.png')
     
     evaluate_and_testing(our_model, path_model, TEST_DATASET_PATH, class_name)
+    # evaluate_and_testing(our_model, "saved_model/110_pcb_150-resnet18_weights.84-0.90.h5", TEST_DATASET_PATH, class_name)    
 
 
 # In[ ]:
@@ -629,12 +644,12 @@ if __name__ == "__main__":
     if CHOOSEN_MODEL == 1:
         name_model = name_model + "-resnet18"
     elif CHOOSEN_MODEL == 2:
-        name_model = name_model + "-custom_our_model"
+        name_model = name_model + "-resnet18-v2"
     elif CHOOSEN_MODEL == 3:
         name_model = name_model + "-densenet"
         
     print("start: ", name_model)
-    base_learning_rate = 0.0002
+    base_learning_rate = 0.00002
     num_classes = 8
     class_name = ["0", "1", "2", "3", "4", "5", "6", "7"]
     
@@ -656,4 +671,10 @@ if __name__ == "__main__":
         our_model = build_densenet(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
+
+
+# In[ ]:
+
+
+
 
