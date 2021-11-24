@@ -41,7 +41,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 150
-CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == custom_our_model, 3 == densenet
+CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == custom_our_model, 3 == VGG16
 IMG_H = 42
 IMG_W = 110
 IMG_C = 3  ## Change this to 1 for grayscale.
@@ -250,11 +250,11 @@ def build_VGG16(i_shape, base_lr, n_class):
     base_model.trainable = False
     
     # flatten the output of the convolutional part: 
-    x = keras.layers.Flatten()(base_model.output)
+    x = tf.keras.layers.Flatten()(base_model.output)
     # three hidden layers
-    x = keras.layers.Dense(100, activation='relu')(x)
-    x = keras.layers.Dense(100, activation='relu')(x)
-    x = keras.layers.Dense(100, activation='relu')(x)
+    x = tf.keras.layers.Dense(100, activation='relu')(x)
+    x = tf.keras.layers.Dense(100, activation='relu')(x)
+    x = tf.keras.layers.Dense(100, activation='relu')(x)
 
     # bn = tf.keras.layers.BatchNormalization()(inputs)
     # x = base_model(bn)
