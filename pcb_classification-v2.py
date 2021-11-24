@@ -41,7 +41,7 @@ assert version.parse(tf.__version__).release[0] >= 2,     "This notebook require
 
 """ Set Hyper parameters """
 NUM_EPOCHS = 150
-CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == custom_our_model, 3 == VGG16
+CHOOSEN_MODEL = 1 # 1 == resnet18, 2 == custom_our_model, 3 == VGG
 IMG_H = 42
 IMG_W = 110
 IMG_C = 3  ## Change this to 1 for grayscale.
@@ -264,7 +264,7 @@ def build_VGG16(i_shape, base_lr, n_class):
     
     out =tf.keras.layers.Dense(n_class, activation="softmax")(x)
     
-    model = tf.keras.models.Model(inputs, out)
+    model = tf.keras.models.Model(inputs=base_model.input, outputs=out)
     model.compile(loss='sparse_categorical_crossentropy',
                   optimizer = tf.keras.optimizers.Adam(learning_rate=base_lr),
                   metrics=['accuracy'])
