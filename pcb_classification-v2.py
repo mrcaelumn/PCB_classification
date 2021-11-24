@@ -243,16 +243,23 @@ def build_our_model(i_shape, base_lr, n_class):
 # In[ ]:
 
 
-def build_densenet(i_shape, base_lr, n_class):
+def build_VGG16(i_shape, base_lr, n_class):
     inputs = tf.keras.layers.Input(i_shape)
     
-    base_model = tf.keras.applications.densenet.DenseNet121(weights="imagenet", input_shape=i_shape, include_top=False)
+    base_model = tf.keras.applications.vgg16.VGG16(weights="imagenet", input_shape=i_shape, include_top=False)
     base_model.trainable = False
-        
-    bn = tf.keras.layers.BatchNormalization()(inputs)
-    x = base_model(bn)
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(1024, activation='relu')(x)
+    
+    # flatten the output of the convolutional part: 
+    x = keras.layers.Flatten()(base_model.output)
+    # three hidden layers
+    x = keras.layers.Dense(100, activation='relu')(x)
+    x = keras.layers.Dense(100, activation='relu')(x)
+    x = keras.layers.Dense(100, activation='relu')(x)
+
+    # bn = tf.keras.layers.BatchNormalization()(inputs)
+    # x = base_model(bn)
+    # x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    # x = tf.keras.layers.Dense(1024, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.5)(x)
     
     out =tf.keras.layers.Dense(n_class, activation="softmax")(x)
@@ -313,7 +320,9 @@ def build_resnet18(i_shape, base_lr, n_class):
             t = residual_block(t, downsample=(j==0 and i!=0), filters=num_filters)
         num_filters *= 2
     
-    t = tf.keras.layers.MaxPooling2D()(t)
+    
+    t = tf.keras.layers.AveragePooling2D(4)(t)
+    t = tf.keras.layers.Dense(1024, activation='relu')(t)    
     t = tf.keras.layers.Flatten()(t)
     t = tf.keras.layers.ReLU()(t)
     t = tf.keras.layers.Dropout(0.5)(t)
@@ -568,7 +577,7 @@ def create_class_weight(labels_dict,mu=0.15):
     class_weight = dict()
     
     for key in keys:
-        score = math.log(mu*total/float(labels_dict[key]))
+        score = total/(len(labels_dict)*float(labels_dict[key]))
         class_weight[key] = score
     
     return class_weight
@@ -597,7 +606,7 @@ def __run__(our_model, train_dataset, val_dataset, num_epochs, path_model, name_
             epochs=num_epochs,
             validation_data=val_dataset,
             batch_size=BATCH_SIZE,
-            class_weight=train_class_weights,
+            # class_weight=train_class_weights,
             callbacks=callbacks_func,
         )
 
@@ -646,7 +655,7 @@ if __name__ == "__main__":
     elif CHOOSEN_MODEL == 2:
         name_model = name_model + "-resnet18-v2"
     elif CHOOSEN_MODEL == 3:
-        name_model = name_model + "-densenet"
+        name_model = name_model + "-VGG16"
         
     print("start: ", name_model)
     base_learning_rate = 0.00002
@@ -668,7 +677,7 @@ if __name__ == "__main__":
     if CHOOSEN_MODEL == 2:
         our_model = build_our_model(input_shape, base_learning_rate, num_classes)
     elif CHOOSEN_MODEL == 3:
-        our_model = build_densenet(input_shape, base_learning_rate, num_classes)
+        our_model = build_VGG16(input_shape, base_learning_rate, num_classes)
     
     __run__(our_model, train_dataset, val_dataset, NUM_EPOCHS, path_model, name_model, class_name)
 
